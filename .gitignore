@@ -1,0 +1,9 @@
+/vendor/
+/composer.lock
+/.phpunit.result.cache
+/phpunit.xml
+.env
+.DS_Store
+/coverage/
+/laravel-test-app/
+postman_collection.json
