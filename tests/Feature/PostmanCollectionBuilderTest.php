@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Hopheartsceo\PostmanExporter\Tests\Feature;
 
 use Hopheartsceo\PostmanExporter\Services\PostmanCollectionBuilderService;
+use Hopheartsceo\PostmanExporter\Services\FolderOrganizerService;
 use Hopheartsceo\PostmanExporter\Tests\TestCase;
 
 class PostmanCollectionBuilderTest extends TestCase
@@ -138,23 +139,25 @@ class PostmanCollectionBuilderTest extends TestCase
 
         $items = $collection['item'];
 
-        // Should have folders (at least 2: api/users and api/posts)
-        $this->assertGreaterThanOrEqual(2, count($items));
+        // With hierarchical grouping, we should have 1 top level folder: "Api"
+        $this->assertCount(1, $items);
+        $this->assertEquals('Api', $items[0]['name']);
 
-        // Each should be a folder (has 'item' key)
-        foreach ($items as $folder) {
-            $this->assertArrayHasKey('item', $folder);
-            $this->assertArrayHasKey('name', $folder);
-        }
+        // Under "Api", we should have "Users" and "Posts"
+        $apiFolder = $items[0]['item'];
+        $folderNames = array_column($apiFolder, 'name');
+        $this->assertContains('Users', $folderNames);
+        $this->assertContains('Posts', $folderNames);
     }
 
     public function test_request_item_has_correct_structure(): void
     {
         $collection = $this->builder->build($this->getSampleRoutes());
 
-        // Get first request from first folder
-        $firstFolder = $collection['item'][0];
-        $firstRequest = $firstFolder['item'][0];
+        // Navigate to a request: Api -> Users -> GET users.index
+        $apiFolder = $collection['item'][0];
+        $usersFolder = $apiFolder['item'][0];
+        $firstRequest = $usersFolder['item'][0];
 
         $this->assertArrayHasKey('name', $firstRequest);
         $this->assertArrayHasKey('request', $firstRequest);
@@ -167,8 +170,9 @@ class PostmanCollectionBuilderTest extends TestCase
     {
         $collection = $this->builder->build($this->getSampleRoutes());
 
-        $firstFolder = $collection['item'][0];
-        $firstRequest = $firstFolder['item'][0];
+        $apiFolder = $collection['item'][0];
+        $usersFolder = $apiFolder['item'][0];
+        $firstRequest = $usersFolder['item'][0];
         $url = $firstRequest['request']['url'];
 
         $this->assertArrayHasKey('raw', $url);
@@ -181,16 +185,8 @@ class PostmanCollectionBuilderTest extends TestCase
     {
         $collection = $this->builder->build($this->getSampleRoutes());
 
-        // Find POST request
-        $postRequest = null;
-        foreach ($collection['item'] as $folder) {
-            foreach ($folder['item'] as $item) {
-                if ($item['request']['method'] === 'POST') {
-                    $postRequest = $item;
-                    break 2;
-                }
-            }
-        }
+        // Find POST request recursively
+        $postRequest = $this->findRequestByMethod($collection['item'], 'POST');
 
         $this->assertNotNull($postRequest);
         $this->assertArrayHasKey('body', $postRequest['request']);
@@ -201,9 +197,8 @@ class PostmanCollectionBuilderTest extends TestCase
     {
         $collection = $this->builder->build($this->getSampleRoutes());
 
-        $firstFolder = $collection['item'][0];
-        $firstRequest = $firstFolder['item'][0];
-        $headers = $firstRequest['request']['header'];
+        $request = $this->findRequestByMethod($collection['item'], 'GET');
+        $headers = $request['request']['header'];
 
         $this->assertNotEmpty($headers);
 
@@ -216,10 +211,9 @@ class PostmanCollectionBuilderTest extends TestCase
     {
         $collection = $this->builder->build($this->getSampleRoutes());
 
-        // First route has auth:sanctum middleware
-        $firstFolder = $collection['item'][0];
-        $firstRequest = $firstFolder['item'][0];
-        $headers = $firstRequest['request']['header'];
+        // Find a request in the users folder (which has auth)
+        $request = $this->findRequestByName($collection['item'], 'users.index');
+        $headers = $request['request']['header'];
 
         $headerKeys = array_column($headers, 'key');
         $this->assertContains('Authorization', $headerKeys);
@@ -230,15 +224,7 @@ class PostmanCollectionBuilderTest extends TestCase
         $collection = $this->builder->build($this->getSampleRoutes());
 
         // Find route with {id} parameter
-        $routeWithParam = null;
-        foreach ($collection['item'] as $folder) {
-            foreach ($folder['item'] as $item) {
-                if (isset($item['request']['url']['variable'])) {
-                    $routeWithParam = $item;
-                    break 2;
-                }
-            }
-        }
+        $routeWithParam = $this->findRequestByName($collection['item'], 'users.show');
 
         $this->assertNotNull($routeWithParam);
         $variables = $routeWithParam['request']['url']['variable'];
@@ -249,16 +235,8 @@ class PostmanCollectionBuilderTest extends TestCase
     {
         $collection = $this->builder->build($this->getSampleRoutes());
 
-        // Find GET /api/users which has query params
-        $getRequest = null;
-        foreach ($collection['item'] as $folder) {
-            foreach ($folder['item'] as $item) {
-                if ($item['request']['method'] === 'GET' && isset($item['request']['url']['query'])) {
-                    $getRequest = $item;
-                    break 2;
-                }
-            }
-        }
+        // Find users.index which has query params
+        $getRequest = $this->findRequestByName($collection['item'], 'users.index');
 
         $this->assertNotNull($getRequest);
         $queryKeys = array_column($getRequest['request']['url']['query'], 'key');
@@ -266,11 +244,40 @@ class PostmanCollectionBuilderTest extends TestCase
         $this->assertContains('per_page', $queryKeys);
     }
 
+    protected function findRequestByMethod(array $items, string $method): ?array
+    {
+        foreach ($items as $item) {
+            if (isset($item['request']) && $item['request']['method'] === $method) {
+                return $item;
+            }
+            if (isset($item['item'])) {
+                $found = $this->findRequestByMethod($item['item'], $method);
+                if ($found) return $found;
+            }
+        }
+        return null;
+    }
+
+    protected function findRequestByName(array $items, string $name): ?array
+    {
+        foreach ($items as $item) {
+            if (isset($item['request']) && $item['name'] === $name) {
+                return $item;
+            }
+            if (isset($item['item'])) {
+                $found = $this->findRequestByName($item['item'], $name);
+                if ($found) return $found;
+            }
+        }
+        return null;
+    }
+
     public function test_flat_mode_no_folders(): void
     {
         $config = $this->app['config']->get('postman-exporter');
-        $config['group_routes'] = false;
-        $builder = new PostmanCollectionBuilderService($config);
+        $config['grouping']['enabled'] = false;
+        $organizer = new FolderOrganizerService($config);
+        $builder = new PostmanCollectionBuilderService($organizer, $config);
 
         $collection = $builder->build($this->getSampleRoutes());
 

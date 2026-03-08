@@ -14,7 +14,7 @@ Automatically generate **Postman Collection v2.1** files from your Laravel appli
 - 📝 **Request Analysis** — Extracts validation rules from FormRequest classes and inline `$request->validate()` calls
 - 🎯 **Smart Example Data** — Generates realistic sample values based on validation rules and field names
 - 🔐 **Authentication Detection** — Automatically adds auth headers based on middleware (Sanctum, Passport, etc.)
-- 📁 **Folder Grouping** — Organizes requests into folders by route prefix
+- 📁 **Hierarchical Grouping** — Organizes requests into nested folders based on route prefixes
 - 🚀 **Postman Upload** — Optionally upload collections directly via the Postman API
 - ⚡ **Artisan Command** — Beautiful CLI with progress indicators and colored output
 
@@ -100,10 +100,23 @@ After publishing, edit `config/postman-exporter.php`:
 | `default_headers` | array | Accept + Content-Type JSON | Default headers on every request |
 | `output_path` | string | `storage/app/postman-collection.json` | Default output path |
 | `collection_name` | string | App name + " API Collection" | Name of the Postman collection |
-| `group_routes` | bool | `true` | Group routes into folders by prefix |
+| `grouping` | array | (see below) | Folder grouping configuration |
 | `include_web_routes` | bool | `false` | Include non-API routes |
 | `postman_api_key` | string | `''` | Postman API key for uploads |
 | `enable_upload` | bool | `false` | Auto-upload after generation |
+
+### Folder Grouping
+
+```php
+'grouping' => [
+    'enabled' => true,
+    'strategy' => 'prefix',
+    'fallback_folder' => 'General',
+    'nested_folders' => true,
+],
+```
+
+Example: `Route::prefix('api/v1/admin')` creates a nested structure: `api` > `v1` > `admin`.
 
 ### Route Filters
 

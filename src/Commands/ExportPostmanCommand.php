@@ -124,7 +124,7 @@ class ExportPostmanCommand extends Command
     protected function applyOptions(): void
     {
         if ($this->option('group-by-prefix')) {
-            config(['postman-exporter.group_routes' => true]);
+            config(['postman-exporter.grouping.enabled' => true]);
         }
 
         if ($this->option('include-web-routes')) {

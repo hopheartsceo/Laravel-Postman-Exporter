@@ -108,13 +108,23 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Group Routes
+    | Folder Grouping
     |--------------------------------------------------------------------------
     |
-    | Whether to group routes into folders by their URI prefix.
+    | Define how requests should be organized into folders.
+    |
+    | enabled: Whether to enable folder grouping.
+    | strategy: The grouping strategy (currently only 'prefix').
+    | fallback_folder: Folder name for routes without a prefix.
+    | nested_folders: Whether to create nested folders for deep prefixes.
     |
     */
-    'group_routes' => true,
+    'grouping' => [
+        'enabled' => true,
+        'strategy' => 'prefix',
+        'fallback_folder' => 'General',
+        'nested_folders' => true,
+    ],
 
     /*
     |--------------------------------------------------------------------------

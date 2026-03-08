@@ -5,14 +5,15 @@ declare(strict_types=1);
 namespace Hopheartsceo\PostmanExporter\Services;
 
 use Hopheartsceo\PostmanExporter\Contracts\CollectionBuilderInterface;
+use Hopheartsceo\PostmanExporter\Contracts\FolderOrganizerInterface;
 
 /**
  * Builds a Postman Collection v2.1 JSON structure from analyzed route data.
  */
 class PostmanCollectionBuilderService implements CollectionBuilderInterface
-
 {
     public function __construct(
+        protected FolderOrganizerInterface $organizer,
         protected array $config,
     ) {}
 
@@ -24,13 +25,7 @@ class PostmanCollectionBuilderService implements CollectionBuilderInterface
      */
     public function build(array $analyzedRoutes): array
     {
-        $groupRoutes = $this->config['group_routes'] ?? true;
-
-        if ($groupRoutes) {
-            $items = $this->buildGroupedItems($analyzedRoutes);
-        } else {
-            $items = $this->buildFlatItems($analyzedRoutes);
-        }
+        $items = $this->organizer->organize($analyzedRoutes, [$this, 'buildRequestItem']);
 
         return [
             'info' => [
@@ -56,62 +51,12 @@ class PostmanCollectionBuilderService implements CollectionBuilderInterface
     }
 
     /**
-     * Build items grouped by route prefix (folders).
-     *
-     * @param  array<int, array<string, mixed>>  $routes
-     * @return array<int, array<string, mixed>>
-     */
-    protected function buildGroupedItems(array $routes): array
-    {
-        $groups = [];
-
-        foreach ($routes as $route) {
-            $prefix = $route['prefix'] ?? 'Other';
-            if (! isset($groups[$prefix])) {
-                $groups[$prefix] = [];
-            }
-            $groups[$prefix][] = $route;
-        }
-
-        $items = [];
-        foreach ($groups as $prefix => $groupRoutes) {
-            $folderItems = [];
-            foreach ($groupRoutes as $route) {
-                $folderItems[] = $this->buildRequestItem($route);
-            }
-
-            $items[] = [
-                'name' => $this->humanizePrefix($prefix),
-                'item' => $folderItems,
-                'description' => 'Routes for ' . $prefix,
-            ];
-        }
-
-        return $items;
-    }
-
-    /**
-     * Build items as a flat list (no folders).
-     *
-     * @param  array<int, array<string, mixed>>  $routes
-     * @return array<int, array<string, mixed>>
-     */
-    protected function buildFlatItems(array $routes): array
-    {
-        $items = [];
-        foreach ($routes as $route) {
-            $items[] = $this->buildRequestItem($route);
-        }
-        return $items;
-    }
-
-    /**
      * Build a single Postman request item.
      *
      * @param  array<string, mixed>  $route
      * @return array<string, mixed>
      */
-    protected function buildRequestItem(array $route): array
+    public function buildRequestItem(array $route): array
     {
         $method = strtoupper($route['method']);
         $uri = $route['uri'];

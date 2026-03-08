@@ -6,11 +6,13 @@ namespace Hopheartsceo\PostmanExporter;
 
 use Hopheartsceo\PostmanExporter\Commands\ExportPostmanCommand;
 use Hopheartsceo\PostmanExporter\Services\ExampleDataGeneratorService;
+use Hopheartsceo\PostmanExporter\Services\FolderOrganizerService;
 use Hopheartsceo\PostmanExporter\Services\PostmanCollectionBuilderService;
 use Hopheartsceo\PostmanExporter\Services\PostmanUploaderService;
 use Hopheartsceo\PostmanExporter\Services\RequestAnalyzerService;
 use Hopheartsceo\PostmanExporter\Services\RouteScannerService;
 use Hopheartsceo\PostmanExporter\Services\ValidationParserService;
+use Hopheartsceo\PostmanExporter\Contracts\FolderOrganizerInterface;
 use Illuminate\Support\ServiceProvider;
 
 class PostmanExporterServiceProvider extends ServiceProvider
@@ -49,8 +51,17 @@ class PostmanExporterServiceProvider extends ServiceProvider
             );
         });
 
+        $this->app->singleton(FolderOrganizerService::class, function ($app) {
+            return new FolderOrganizerService(
+                $app['config']->get('postman-exporter')
+            );
+        });
+
+        $this->app->bind(FolderOrganizerInterface::class, FolderOrganizerService::class);
+
         $this->app->singleton(PostmanCollectionBuilderService::class, function ($app) {
             return new PostmanCollectionBuilderService(
+                $app->make(FolderOrganizerService::class),
                 $app['config']->get('postman-exporter')
             );
         });
