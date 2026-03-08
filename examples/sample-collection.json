@@ -7,35 +7,257 @@
     },
     "item": [
         {
-            "name": "Api",
+            "name": "auth",
             "item": [
                 {
-                    "name": "V1",
-                    "item": [
+                    "name": "POST Login",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            { "key": "Accept", "value": "application/json", "type": "text" },
+                            { "key": "Content-Type", "value": "application/json", "type": "text" }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"email\": \"user@example.com\",\n  \"password\": \"password123\"\n}",
+                            "options": {
+                                "raw": { "language": "json" }
+                            }
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/auth/login",
+                            "host": ["{{base_url}}"],
+                            "path": ["auth", "login"]
+                        }
+                    },
+                    "response": [
                         {
-                            "name": "Auth",
-                            "item": [
-                                {
-                                    "name": "POST Login",
-                                    "request": {
-                                        "method": "POST",
-                                        "header": [],
-                                        "url": {
-                                            "raw": "{{base_url}}/api/v1/auth/login",
-                                            "host": ["{{base_url}}"],
-                                            "path": ["api", "v1", "auth", "login"]
-                                        }
-                                    }
+                            "name": "Success Response",
+                            "originalRequest": {
+                                "method": "POST",
+                                "url": {
+                                    "raw": "{{base_url}}/auth/login",
+                                    "host": ["{{base_url}}"],
+                                    "path": ["auth", "login"]
                                 }
-                            ]
+                            },
+                            "status": "OK",
+                            "code": 200,
+                            "_postman_previewlanguage": "json",
+                            "header": [
+                                { "key": "Content-Type", "value": "application/json" }
+                            ],
+                            "body": "{\n  \"status\": \"success\",\n  \"token\": \"eyJhbGciOiJIUzI1NiJ9...\"\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "POST Logout",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            { "key": "Accept", "value": "application/json", "type": "text" },
+                            { "key": "Content-Type", "value": "application/json", "type": "text" },
+                            { "key": "Authorization", "value": "Bearer {{token}}", "type": "text" }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/auth/logout",
+                            "host": ["{{base_url}}"],
+                            "path": ["auth", "logout"]
+                        }
+                    },
+                    "response": [
+                        {
+                            "name": "Success Response",
+                            "originalRequest": {
+                                "method": "POST",
+                                "url": {
+                                    "raw": "{{base_url}}/auth/logout",
+                                    "host": ["{{base_url}}"],
+                                    "path": ["auth", "logout"]
+                                }
+                            },
+                            "status": "OK",
+                            "code": 200,
+                            "_postman_previewlanguage": "json",
+                            "header": [
+                                { "key": "Content-Type", "value": "application/json" }
+                            ],
+                            "body": "{\n  \"message\": \"Success\"\n}"
                         }
                     ]
                 }
-            ]
+            ],
+            "description": "Routes for auth"
+        },
+        {
+            "name": "api",
+            "item": [
+                {
+                    "name": "users.index",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            { "key": "Accept", "value": "application/json", "type": "text" },
+                            { "key": "Content-Type", "value": "application/json", "type": "text" },
+                            { "key": "Authorization", "value": "Bearer {{token}}", "type": "text" }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/users",
+                            "host": ["{{base_url}}"],
+                            "path": ["api", "users"]
+                        }
+                    },
+                    "response": [
+                        {
+                            "name": "Success Response",
+                            "originalRequest": {
+                                "method": "GET",
+                                "url": {
+                                    "raw": "{{base_url}}/api/users",
+                                    "host": ["{{base_url}}"],
+                                    "path": ["api", "users"]
+                                }
+                            },
+                            "status": "OK",
+                            "code": 200,
+                            "_postman_previewlanguage": "json",
+                            "header": [
+                                { "key": "Content-Type", "value": "application/json" }
+                            ],
+                            "body": "{\n  \"data\": [\n    {\n      \"id\": 1,\n      \"name\": \"John Doe\",\n      \"email\": \"user@example.com\"\n    }\n  ]\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "users.store",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            { "key": "Accept", "value": "application/json", "type": "text" },
+                            { "key": "Content-Type", "value": "application/json", "type": "text" },
+                            { "key": "Authorization", "value": "Bearer {{token}}", "type": "text" }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"name\": \"John Doe\",\n  \"email\": \"user@example.com\",\n  \"password\": \"password123\"\n}",
+                            "options": {
+                                "raw": { "language": "json" }
+                            }
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/users",
+                            "host": ["{{base_url}}"],
+                            "path": ["api", "users"]
+                        }
+                    },
+                    "response": [
+                        {
+                            "name": "Success Response",
+                            "originalRequest": {
+                                "method": "POST",
+                                "url": {
+                                    "raw": "{{base_url}}/api/users",
+                                    "host": ["{{base_url}}"],
+                                    "path": ["api", "users"]
+                                }
+                            },
+                            "status": "Created",
+                            "code": 201,
+                            "_postman_previewlanguage": "json",
+                            "header": [
+                                { "key": "Content-Type", "value": "application/json" }
+                            ],
+                            "body": "{\n  \"status\": \"success\",\n  \"message\": \"User created\"\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "users.show",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            { "key": "Accept", "value": "application/json", "type": "text" },
+                            { "key": "Content-Type", "value": "application/json", "type": "text" },
+                            { "key": "Authorization", "value": "Bearer {{token}}", "type": "text" }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/users/:id",
+                            "host": ["{{base_url}}"],
+                            "path": ["api", "users", ":id"],
+                            "variable": [
+                                { "key": "id", "value": "1", "description": "Path parameter: id" }
+                            ]
+                        }
+                    },
+                    "response": [
+                        {
+                            "name": "Success Response",
+                            "originalRequest": {
+                                "method": "GET",
+                                "url": {
+                                    "raw": "{{base_url}}/api/users/:id",
+                                    "host": ["{{base_url}}"],
+                                    "path": ["api", "users", ":id"]
+                                }
+                            },
+                            "status": "OK",
+                            "code": 200,
+                            "_postman_previewlanguage": "json",
+                            "header": [
+                                { "key": "Content-Type", "value": "application/json" }
+                            ],
+                            "body": "{\n  \"id\": 1,\n  \"name\": \"John Doe\",\n  \"email\": \"user@example.com\"\n}"
+                        }
+                    ]
+                }
+            ],
+            "description": "Routes for api"
+        },
+        {
+            "name": "general",
+            "item": [
+                {
+                    "name": "GET Status",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            { "key": "Accept", "value": "application/json", "type": "text" },
+                            { "key": "Content-Type", "value": "application/json", "type": "text" }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/status",
+                            "host": ["{{base_url}}"],
+                            "path": ["status"]
+                        }
+                    },
+                    "response": [
+                        {
+                            "name": "Success Response",
+                            "originalRequest": {
+                                "method": "GET",
+                                "url": {
+                                    "raw": "{{base_url}}/status",
+                                    "host": ["{{base_url}}"],
+                                    "path": ["status"]
+                                }
+                            },
+                            "status": "OK",
+                            "code": 200,
+                            "_postman_previewlanguage": "json",
+                            "header": [
+                                { "key": "Content-Type", "value": "application/json" }
+                            ],
+                            "body": "{\n  \"message\": \"Success\"\n}"
+                        }
+                    ]
+                }
+            ],
+            "description": "Routes for general"
         }
     ],
     "variable": [
-        { "key": "base_url", "value": "http://localhost" },
-        { "key": "token", "value": "your-auth-token-here" }
+        { "key": "base_url", "value": "http://localhost", "type": "string" },
+        { "key": "token", "value": "your-auth-token-here", "type": "string" }
     ]
 }

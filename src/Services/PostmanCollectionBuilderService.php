@@ -9,12 +9,18 @@ use Hopheartsceo\PostmanExporter\Contracts\FolderOrganizerInterface;
 
 /**
  * Builds a Postman Collection v2.1 JSON structure from analyzed route data.
+ *
+ * Now supports:
+ * - Flat folder grouping by first URI prefix segment
+ * - Response examples attached to each request
  */
 class PostmanCollectionBuilderService implements CollectionBuilderInterface
 {
     public function __construct(
         protected FolderOrganizerInterface $organizer,
         protected array $config,
+        protected ?ResponseExtractorService $responseExtractor = null,
+        protected ?ExampleResponseGeneratorService $responseGenerator = null,
     ) {}
 
     /**
@@ -51,7 +57,7 @@ class PostmanCollectionBuilderService implements CollectionBuilderInterface
     }
 
     /**
-     * Build a single Postman request item.
+     * Build a single Postman request item with optional response examples.
      *
      * @param  array<string, mixed>  $route
      * @return array<string, mixed>
@@ -88,7 +94,27 @@ class PostmanCollectionBuilderService implements CollectionBuilderInterface
         // Add description
         $item['request']['description'] = $this->buildDescription($route);
 
+        // Add response examples if enabled
+        $responsesEnabled = $this->config['responses']['enabled'] ?? false;
+        if ($responsesEnabled && $this->responseExtractor && $this->responseGenerator) {
+            $item['response'] = $this->buildResponseExamples($route, $item['request']);
+        }
+
         return $item;
+    }
+
+    /**
+     * Build response examples for a request.
+     *
+     * @param  array<string, mixed>  $route
+     * @param  array<string, mixed>  $originalRequest
+     * @return array<int, array<string, mixed>>
+     */
+    protected function buildResponseExamples(array $route, array $originalRequest): array
+    {
+        $extractedResponses = $this->responseExtractor->extract($route);
+
+        return $this->responseGenerator->generateAll($extractedResponses, $originalRequest);
     }
 
     /**
@@ -230,22 +256,6 @@ class PostmanCollectionBuilderService implements CollectionBuilderInterface
         }
 
         return implode("\n\n", $parts);
-    }
-
-    /**
-     * Convert a route prefix to a human-readable folder name.
-     */
-    protected function humanizePrefix(string $prefix): string
-    {
-        $prefix = trim($prefix, '/');
-        $segments = explode('/', $prefix);
-
-        // Capitalize each segment
-        $humanized = array_map(function ($segment) {
-            return ucfirst(str_replace(['-', '_'], ' ', $segment));
-        }, $segments);
-
-        return implode(' / ', $humanized);
     }
 
     /**

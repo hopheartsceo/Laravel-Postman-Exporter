@@ -4,7 +4,7 @@
 [![PHP](https://img.shields.io/badge/PHP-8.1%2B-blue.svg)](https://php.net)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-Automatically generate **Postman Collection v2.1** files from your Laravel application routes, controllers, and FormRequest validations.
+Automatically generate **Postman Collection v2.1** files from your Laravel application routes, controllers, and FormRequest validations — complete with **flat folder grouping** and **response examples**.
 
 ---
 
@@ -14,7 +14,8 @@ Automatically generate **Postman Collection v2.1** files from your Laravel appli
 - 📝 **Request Analysis** — Extracts validation rules from FormRequest classes and inline `$request->validate()` calls
 - 🎯 **Smart Example Data** — Generates realistic sample values based on validation rules and field names
 - 🔐 **Authentication Detection** — Automatically adds auth headers based on middleware (Sanctum, Passport, etc.)
-- 📁 **Hierarchical Grouping** — Organizes requests into nested folders based on route prefixes
+- 📁 **Flat Folder Grouping** — Organizes requests into single-level folders by the first URI segment (no nesting)
+- 📋 **Response Examples** — Extracts response structures from PHPDoc, API Resources, `response()->json()`, and Eloquent models
 - 🚀 **Postman Upload** — Optionally upload collections directly via the Postman API
 - ⚡ **Artisan Command** — Beautiful CLI with progress indicators and colored output
 
@@ -66,6 +67,12 @@ php artisan postman:export --output=./docs/api-collection.json
 # Group routes by prefix
 php artisan postman:export --group-by-prefix
 
+# Include response examples
+php artisan postman:export --with-responses
+
+# Combine options
+php artisan postman:export --group-by-prefix --with-responses
+
 # Include web routes
 php artisan postman:export --include-web-routes
 
@@ -101,31 +108,104 @@ After publishing, edit `config/postman-exporter.php`:
 | `output_path` | string | `storage/app/postman-collection.json` | Default output path |
 | `collection_name` | string | App name + " API Collection" | Name of the Postman collection |
 | `grouping` | array | (see below) | Folder grouping configuration |
+| `responses` | array | (see below) | Response examples configuration |
 | `include_web_routes` | bool | `false` | Include non-API routes |
 | `postman_api_key` | string | `''` | Postman API key for uploads |
 | `enable_upload` | bool | `false` | Auto-upload after generation |
 
 ### Folder Grouping
 
+Routes are grouped into **flat, single-level folders** by the first segment of the URI. No nesting is created — every route belongs to exactly one top-level folder.
+
 ```php
 'grouping' => [
-    'enabled' => true,
-    'strategy' => 'prefix',
-    'fallback_folder' => 'General',
-    'nested_folders' => true,
+    'enabled'         => true,
+    'strategy'        => 'prefix',      // Only 'prefix' strategy supported
+    'fallback_folder' => 'general',     // Folder for unprefixed / root routes
 ],
 ```
 
-Example: `Route::prefix('api/v1/admin')` creates a nested structure: `api` > `v1` > `admin`.
+**How it works:**
+
+| URI | Folder |
+|-----|--------|
+| `api/users` | `api` |
+| `api/users/{id}` | `api` |
+| `auth/login` | `auth` |
+| `auth/logout` | `auth` |
+| `status` | `general` (fallback) |
+| `/{id}` | `general` (fallback) |
+
+- The first segment of the URI (`explode('/', $uri)[0]`) becomes the folder name.
+- Routes whose first segment is empty or a parameter (e.g. `{id}`) go to the **fallback folder**.
+- There are **no root-level requests** — every request lives inside a folder.
+- There are **no nested folders** — the structure is always flat.
+
+### Response Examples
+
+Response examples are extracted automatically from your controller methods and attached to each Postman request item.
+
+```php
+'responses' => [
+    'enabled'         => true,
+    'fallback_status' => 200,
+    'fallback_body'   => ['message' => 'Success'],
+],
+```
+
+Or enable at export time with the `--with-responses` flag:
+
+```bash
+php artisan postman:export --with-responses
+```
+
+**Extraction priority (highest to lowest):**
+
+1. **PHPDoc `@response`** — Parses `@response` tags with optional status codes:
+   ```php
+   /**
+    * @response 200 {"id": 1, "name": "John Doe"}
+    * @response {"data": []}
+    */
+   public function index() { ... }
+   ```
+
+2. **API Resource** — Detects `return new UserResource(...)` patterns and reads the Resource's `$fillable`/`$visible` fields.
+
+3. **`response()->json()`** — Parses inline `response()->json([...], 200)` calls to extract the body and status code.
+
+4. **Eloquent Model** — Detects `return User::find(...)` patterns and generates example data from the model's `$fillable` fields.
+
+5. **Fallback** — Uses the configured `fallback_status` and `fallback_body`.
+
+**Generated response format in Postman:**
+
+```json
+{
+    "response": [
+        {
+            "name": "Success Response",
+            "originalRequest": { "method": "GET", "url": { ... } },
+            "status": "OK",
+            "code": 200,
+            "_postman_previewlanguage": "json",
+            "header": [
+                { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": "{\"id\": 1, \"name\": \"John Doe\"}"
+        }
+    ]
+}
+```
 
 ### Route Filters
 
 ```php
 'route_filters' => [
-    'include_prefixes' => [],              // Only include these prefixes
-    'exclude_prefixes' => ['_ignition'],   // Exclude these prefixes
-    'include_middleware' => [],             // Only include routes with these middleware
-    'exclude_middleware' => [],             // Exclude routes with these middleware
+    'include_prefixes'  => [],              // Only include these prefixes
+    'exclude_prefixes'  => ['_ignition'],   // Exclude these prefixes
+    'include_middleware' => [],              // Only include routes with these middleware
+    'exclude_middleware' => [],              // Exclude routes with these middleware
 ],
 ```
 
@@ -146,7 +226,7 @@ Example: `Route::prefix('api/v1/admin')` creates a nested structure: `api` > `v1
 
 ## 📄 Example Output
 
-The generated collection follows the [Postman Collection v2.1 schema](https://schema.getpostman.com/json/collection/v2.1.0/collection.json):
+The generated collection follows the [Postman Collection v2.1 schema](https://schema.getpostman.com/json/collection/v2.1.0/collection.json). Folders are flat (single-level) and each request includes response examples:
 
 ```json
 {
@@ -156,7 +236,7 @@ The generated collection follows the [Postman Collection v2.1 schema](https://sc
     },
     "item": [
         {
-            "name": "Api / Users",
+            "name": "api",
             "item": [
                 {
                     "name": "users.index",
@@ -171,9 +251,67 @@ The generated collection follows the [Postman Collection v2.1 schema](https://sc
                             { "key": "Accept", "value": "application/json" },
                             { "key": "Authorization", "value": "Bearer {{token}}" }
                         ]
-                    }
+                    },
+                    "response": [
+                        {
+                            "name": "Success Response",
+                            "originalRequest": {
+                                "method": "GET",
+                                "url": {
+                                    "raw": "{{base_url}}/api/users",
+                                    "host": ["{{base_url}}"],
+                                    "path": ["api", "users"]
+                                }
+                            },
+                            "status": "OK",
+                            "code": 200,
+                            "_postman_previewlanguage": "json",
+                            "header": [
+                                { "key": "Content-Type", "value": "application/json" }
+                            ],
+                            "body": "{\"data\": [{\"id\": 1, \"name\": \"John Doe\"}]}"
+                        }
+                    ]
                 }
-            ]
+            ],
+            "description": "Routes for api"
+        },
+        {
+            "name": "general",
+            "item": [
+                {
+                    "name": "GET Status",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "raw": "{{base_url}}/status",
+                            "host": ["{{base_url}}"],
+                            "path": ["status"]
+                        }
+                    },
+                    "response": [
+                        {
+                            "name": "Success Response",
+                            "originalRequest": {
+                                "method": "GET",
+                                "url": {
+                                    "raw": "{{base_url}}/status",
+                                    "host": ["{{base_url}}"],
+                                    "path": ["status"]
+                                }
+                            },
+                            "status": "OK",
+                            "code": 200,
+                            "_postman_previewlanguage": "json",
+                            "header": [
+                                { "key": "Content-Type", "value": "application/json" }
+                            ],
+                            "body": "{\"message\": \"Success\"}"
+                        }
+                    ]
+                }
+            ],
+            "description": "Routes for general"
         }
     ],
     "variable": [
@@ -182,6 +320,8 @@ The generated collection follows the [Postman Collection v2.1 schema](https://sc
     ]
 }
 ```
+
+> See [`examples/sample-collection.json`](examples/sample-collection.json) for a full example with multiple folders and response examples.
 
 ---
 
@@ -199,11 +339,14 @@ vendor/bin/phpunit
 
 | Service | Responsibility |
 |---------|---------------|
-| `RouteScannerService` | Scans Laravel routes via the Router |
+| `RouteScannerService` | Scans Laravel routes via the Router; extracts return types, PHPDoc, and API Resource usage |
 | `RequestAnalyzerService` | Extracts FormRequest/inline validation rules |
 | `ValidationParserService` | Parses validation rules into structured format |
 | `ExampleDataGeneratorService` | Generates realistic sample values |
-| `PostmanCollectionBuilderService` | Builds Postman v2.1 JSON structure |
+| `FolderOrganizerService` | Groups routes into flat, single-level folders by first URI segment |
+| `ResponseExtractorService` | Analyzes controller methods to extract response structures (PHPDoc → API Resource → JSON → Model → Fallback) |
+| `ExampleResponseGeneratorService` | Converts extracted response data into Postman-formatted response arrays |
+| `PostmanCollectionBuilderService` | Builds Postman v2.1 JSON structure with folders and response examples |
 | `PostmanUploaderService` | Uploads collections to Postman API |
 
 ---

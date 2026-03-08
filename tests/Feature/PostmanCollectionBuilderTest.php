@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Hopheartsceo\PostmanExporter\Tests\Feature;
 
+use Hopheartsceo\PostmanExporter\Services\ExampleResponseGeneratorService;
 use Hopheartsceo\PostmanExporter\Services\PostmanCollectionBuilderService;
 use Hopheartsceo\PostmanExporter\Services\FolderOrganizerService;
+use Hopheartsceo\PostmanExporter\Services\ResponseExtractorService;
 use Hopheartsceo\PostmanExporter\Tests\TestCase;
 
 class PostmanCollectionBuilderTest extends TestCase
@@ -40,6 +42,9 @@ class PostmanCollectionBuilderTest extends TestCase
                 ],
                 'path_params' => [],
                 'auth_headers' => ['Authorization' => 'Bearer {{token}}'],
+                'return_type' => null,
+                'phpdoc' => null,
+                'uses_api_resource' => false,
             ],
             [
                 'method' => 'POST',
@@ -61,6 +66,9 @@ class PostmanCollectionBuilderTest extends TestCase
                 'query_params' => [],
                 'path_params' => [],
                 'auth_headers' => ['Authorization' => 'Bearer {{token}}'],
+                'return_type' => null,
+                'phpdoc' => null,
+                'uses_api_resource' => false,
             ],
             [
                 'method' => 'GET',
@@ -78,6 +86,9 @@ class PostmanCollectionBuilderTest extends TestCase
                 'query_params' => [],
                 'path_params' => ['id' => 1],
                 'auth_headers' => ['Authorization' => 'Bearer {{token}}'],
+                'return_type' => null,
+                'phpdoc' => null,
+                'uses_api_resource' => false,
             ],
             [
                 'method' => 'GET',
@@ -95,6 +106,9 @@ class PostmanCollectionBuilderTest extends TestCase
                 'query_params' => [],
                 'path_params' => [],
                 'auth_headers' => [],
+                'return_type' => null,
+                'phpdoc' => null,
+                'uses_api_resource' => false,
             ],
         ];
     }
@@ -133,31 +147,36 @@ class PostmanCollectionBuilderTest extends TestCase
         $this->assertContains('token', $keys);
     }
 
-    public function test_routes_are_grouped_by_prefix(): void
+    public function test_routes_are_grouped_by_first_prefix_segment(): void
     {
         $collection = $this->builder->build($this->getSampleRoutes());
 
         $items = $collection['item'];
 
-        // With hierarchical grouping, we should have 1 top level folder: "Api"
+        // All sample routes start with "api/..." so one folder: "api"
         $this->assertCount(1, $items);
-        $this->assertEquals('Api', $items[0]['name']);
+        $this->assertEquals('api', $items[0]['name']);
 
-        // Under "Api", we should have "Users" and "Posts"
-        $apiFolder = $items[0]['item'];
-        $folderNames = array_column($apiFolder, 'name');
-        $this->assertContains('Users', $folderNames);
-        $this->assertContains('Posts', $folderNames);
+        // "api" folder should contain 4 request items (flat, no sub-folders)
+        $this->assertCount(4, $items[0]['item']);
+    }
+
+    public function test_no_root_level_requests(): void
+    {
+        $collection = $this->builder->build($this->getSampleRoutes());
+
+        foreach ($collection['item'] as $item) {
+            $this->assertArrayHasKey('item', $item, 'All top-level items must be folders');
+        }
     }
 
     public function test_request_item_has_correct_structure(): void
     {
         $collection = $this->builder->build($this->getSampleRoutes());
 
-        // Navigate to a request: Api -> Users -> GET users.index
+        // Navigate to the first request in the "api" folder
         $apiFolder = $collection['item'][0];
-        $usersFolder = $apiFolder['item'][0];
-        $firstRequest = $usersFolder['item'][0];
+        $firstRequest = $apiFolder['item'][0];
 
         $this->assertArrayHasKey('name', $firstRequest);
         $this->assertArrayHasKey('request', $firstRequest);
@@ -171,8 +190,7 @@ class PostmanCollectionBuilderTest extends TestCase
         $collection = $this->builder->build($this->getSampleRoutes());
 
         $apiFolder = $collection['item'][0];
-        $usersFolder = $apiFolder['item'][0];
-        $firstRequest = $usersFolder['item'][0];
+        $firstRequest = $apiFolder['item'][0];
         $url = $firstRequest['request']['url'];
 
         $this->assertArrayHasKey('raw', $url);
@@ -211,7 +229,7 @@ class PostmanCollectionBuilderTest extends TestCase
     {
         $collection = $this->builder->build($this->getSampleRoutes());
 
-        // Find a request in the users folder (which has auth)
+        // Find a request that has auth headers
         $request = $this->findRequestByName($collection['item'], 'users.index');
         $headers = $request['request']['header'];
 
@@ -242,6 +260,48 @@ class PostmanCollectionBuilderTest extends TestCase
         $queryKeys = array_column($getRequest['request']['url']['query'], 'key');
         $this->assertContains('page', $queryKeys);
         $this->assertContains('per_page', $queryKeys);
+    }
+
+    public function test_response_examples_included_when_enabled(): void
+    {
+        // Enable responses in config
+        $this->app['config']->set('postman-exporter.responses.enabled', true);
+        $builder = $this->app->make(PostmanCollectionBuilderService::class);
+
+        $collection = $builder->build($this->getSampleRoutes());
+
+        // Find a request and verify it has responses
+        $request = $this->findRequestByName($collection['item'], 'users.index');
+        $this->assertNotNull($request);
+        $this->assertArrayHasKey('response', $request);
+        $this->assertNotEmpty($request['response']);
+
+        // Verify response structure
+        $response = $request['response'][0];
+        $this->assertArrayHasKey('name', $response);
+        $this->assertArrayHasKey('status', $response);
+        $this->assertArrayHasKey('code', $response);
+        $this->assertArrayHasKey('body', $response);
+        $this->assertArrayHasKey('_postman_previewlanguage', $response);
+        $this->assertEquals('json', $response['_postman_previewlanguage']);
+    }
+
+    public function test_response_examples_empty_when_disabled(): void
+    {
+        // Disable responses in config
+        $this->app['config']->set('postman-exporter.responses.enabled', false);
+
+        // Force fresh instances since services are singletons
+        $this->app->forgetInstance(PostmanCollectionBuilderService::class);
+        $this->app->forgetInstance(FolderOrganizerService::class);
+        $this->app->forgetInstance(ExampleResponseGeneratorService::class);
+        $builder = $this->app->make(PostmanCollectionBuilderService::class);
+
+        $collection = $builder->build($this->getSampleRoutes());
+
+        $request = $this->findRequestByName($collection['item'], 'users.index');
+        $this->assertNotNull($request);
+        $this->assertEmpty($request['response']);
     }
 
     protected function findRequestByMethod(array $items, string $method): ?array

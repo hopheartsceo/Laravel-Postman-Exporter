@@ -7,7 +7,11 @@ namespace Hopheartsceo\PostmanExporter\Services;
 use Hopheartsceo\PostmanExporter\Contracts\FolderOrganizerInterface;
 
 /**
- * Organizes routes into a hierarchical folder structure based on prefixes.
+ * Organizes routes into folder groups based on URI prefix.
+ *
+ * All routes sharing the same first URI prefix segment are grouped into one folder.
+ * Routes without a prefix go into a configurable fallback folder (default: "general").
+ * No nested folders are created — only flat, single-level grouping.
  */
 class FolderOrganizerService implements FolderOrganizerInterface
 {
@@ -16,118 +20,90 @@ class FolderOrganizerService implements FolderOrganizerInterface
     ) {}
 
     /**
-     * Organize routes into a hierarchical folder structure.
+     * Organize routes into a flat folder structure grouped by first URI prefix segment.
+     *
+     * @param  array<int, array<string, mixed>>  $routes
+     * @param  callable  $requestBuilder
+     * @return array<int, array<string, mixed>>
      */
     public function organize(array $routes, callable $requestBuilder): array
     {
         $groupingConfig = $this->config['grouping'] ?? [];
         $enabled = $groupingConfig['enabled'] ?? true;
-        
-        if (!$enabled) {
+
+        if (! $enabled) {
             return array_map($requestBuilder, $routes);
         }
 
-        $fallbackFolder = $groupingConfig['fallback_folder'] ?? 'General';
-        $nestedFolders = $groupingConfig['nested_folders'] ?? true;
+        $fallbackFolder = $groupingConfig['fallback_folder'] ?? 'general';
 
-        $tree = [];
+        // Group routes by their first prefix segment
+        $groups = [];
 
         foreach ($routes as $route) {
-            $segments = $this->getFolderSegments($route, $fallbackFolder, $nestedFolders);
-            $this->addToTree($tree, $segments, $requestBuilder($route));
-        }
+            $folderName = $this->resolveFolderName($route, $fallbackFolder);
 
-        return $this->formatTree($tree);
-    }
-
-    /**
-     * Extract folder segments from route data.
-     */
-    protected function getFolderSegments(array $route, string $fallbackFolder, bool $nestedFolders): array
-    {
-        $prefix = $route['prefix'] ?? '';
-        $prefix = trim($prefix, '/');
-
-        if (empty($prefix)) {
-            return [$fallbackFolder];
-        }
-
-        // Split into segments and clean up
-        $segments = array_values(array_filter(explode('/', $prefix)));
-
-        // Remove segments that look like parameters {id} or :id
-        $cleanSegments = array_filter($segments, function ($segment) {
-            return !preg_match('/^[\{:]\w+\??\}?$/', $segment);
-        });
-
-        if (empty($cleanSegments)) {
-            return [$fallbackFolder];
-        }
-
-        if (!$nestedFolders) {
-            return [implode(' / ', array_map([$this, 'humanize'], $cleanSegments))];
-        }
-
-        return array_map([$this, 'humanize'], array_values($cleanSegments));
-    }
-
-    /**
-     * Add a request item to the folder tree.
-     */
-    protected function addToTree(array &$tree, array $segments, array $requestItem): void
-    {
-        $current = &$tree;
-
-        foreach ($segments as $segment) {
-            if (!isset($current['folders'][$segment])) {
-                $current['folders'][$segment] = [
-                    'folders' => [],
-                    'items' => [],
-                ];
+            if (! isset($groups[$folderName])) {
+                $groups[$folderName] = [];
             }
-            $current = &$current['folders'][$segment];
+
+            $groups[$folderName][] = $requestBuilder($route);
         }
 
-        $current['items'][] = $requestItem;
+        // Convert groups to Postman folder format
+        return $this->buildFolders($groups);
     }
 
     /**
-     * Format the internal tree into Postman's recursive item structure.
+     * Resolve the folder name for a route based on its first URI prefix segment.
+     *
+     * A route is considered "prefixed" only if it has more than one segment
+     * (e.g. "api/users" → prefix "api"). Single-segment routes like "status"
+     * have no prefix and go into the fallback folder.
      */
-    protected function formatTree(array $tree): array
+    protected function resolveFolderName(array $route, string $fallbackFolder): string
     {
-        $output = [];
+        $uri = trim($route['uri'] ?? '', '/');
 
-        // Add root items if any (shouldn't be any in this logic, but for safety)
-        if (isset($tree['items'])) {
-            foreach ($tree['items'] as $item) {
-                $output[] = $item;
-            }
+        if (empty($uri)) {
+            return $fallbackFolder;
         }
 
-        // Process folders
-        if (isset($tree['folders'])) {
-            foreach ($tree['folders'] as $name => $node) {
-                $folder = [
-                    'name' => $name,
-                    'item' => array_merge(
-                        $this->formatTree($node),
-                        $node['items']
-                    ),
-                    'description' => 'Routes for ' . $name,
-                ];
-                $output[] = $folder;
-            }
+        $segments = explode('/', $uri);
+
+        // Single-segment routes have no prefix — use fallback
+        if (count($segments) < 2) {
+            return $fallbackFolder;
         }
 
-        return $output;
+        $firstSegment = $segments[0] ?? '';
+
+        // If first segment is empty or looks like a parameter, use fallback
+        if (empty($firstSegment) || preg_match('/^[\{:]/', $firstSegment)) {
+            return $fallbackFolder;
+        }
+
+        return $firstSegment;
     }
 
     /**
-     * Humanize a segment name (e.g., 'auth-api' -> 'Auth Api').
+     * Build Postman folder items from grouped routes.
+     *
+     * @param  array<string, array<int, array<string, mixed>>>  $groups
+     * @return array<int, array<string, mixed>>
      */
-    protected function humanize(string $segment): string
+    protected function buildFolders(array $groups): array
     {
-        return ucfirst(str_replace(['-', '_'], ' ', $segment));
+        $folders = [];
+
+        foreach ($groups as $name => $items) {
+            $folders[] = [
+                'name' => $name,
+                'item' => $items,
+                'description' => 'Routes for ' . $name,
+            ];
+        }
+
+        return $folders;
     }
 }

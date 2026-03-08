@@ -65,5 +65,17 @@ abstract class TestCase extends OrchestraTestCase
             'include_middleware' => [],
             'exclude_middleware' => [],
         ]);
+        $app['config']->set('postman-exporter.grouping', [
+            'enabled' => true,
+            'strategy' => 'prefix',
+            'fallback_folder' => 'general',
+        ]);
+        $app['config']->set('postman-exporter.responses', [
+            'enabled' => true,
+            'fallback_status' => 200,
+            'fallback_body' => [
+                'message' => 'Success',
+            ],
+        ]);
     }
 }

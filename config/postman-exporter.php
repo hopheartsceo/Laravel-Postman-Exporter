@@ -115,15 +115,44 @@ return [
     |
     | enabled: Whether to enable folder grouping.
     | strategy: The grouping strategy (currently only 'prefix').
-    | fallback_folder: Folder name for routes without a prefix.
-    | nested_folders: Whether to create nested folders for deep prefixes.
+    | fallback_folder: Folder name for routes that have no prefix.
+    |
+    | All routes sharing the same first URI prefix segment are grouped
+    | into one Postman folder. Routes without a prefix go into the
+    | fallback folder. No nested folders are created.
     |
     */
     'grouping' => [
         'enabled' => true,
         'strategy' => 'prefix',
-        'fallback_folder' => 'General',
-        'nested_folders' => true,
+        'fallback_folder' => 'general',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Response Examples
+    |--------------------------------------------------------------------------
+    |
+    | Include response examples in each Postman request.
+    |
+    | enabled: Whether to include response examples.
+    | fallback_status: Default HTTP status code when no response is detected.
+    | fallback_body: Default response body when no response is detected.
+    |
+    | Response sources (in priority order):
+    | 1. PHPDoc @response annotations
+    | 2. API Resource classes
+    | 3. response()->json() calls
+    | 4. Model return types
+    | 5. Fallback default response
+    |
+    */
+    'responses' => [
+        'enabled' => true,
+        'fallback_status' => 200,
+        'fallback_body' => [
+            'message' => 'Success',
+        ],
     ],
 
     /*

@@ -21,6 +21,7 @@ class ExportPostmanCommand extends Command
         {--output= : Custom output file path}
         {--group-by-prefix : Group routes into folders by prefix}
         {--include-web-routes : Include web (non-API) routes}
+        {--with-responses : Include response examples in the collection}
         {--upload : Upload collection to Postman}
         {--api-key= : Postman API key for upload}';
 
@@ -71,6 +72,12 @@ class ExportPostmanCommand extends Command
         // Count items
         $itemCount = $this->countItems($collection['item'] ?? []);
         $this->components->info("  Found {$itemCount} route(s)");
+
+        // Show response status
+        if (config('postman-exporter.responses.enabled')) {
+            $this->components->info('  📋 Response examples included');
+        }
+
         $this->newLine();
 
         // Step 3: Save file
@@ -129,6 +136,10 @@ class ExportPostmanCommand extends Command
 
         if ($this->option('include-web-routes')) {
             config(['postman-exporter.include_web_routes' => true]);
+        }
+
+        if ($this->option('with-responses')) {
+            config(['postman-exporter.responses.enabled' => true]);
         }
     }
 

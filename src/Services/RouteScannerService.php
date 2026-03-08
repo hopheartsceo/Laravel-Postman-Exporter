@@ -7,9 +7,11 @@ namespace Hopheartsceo\PostmanExporter\Services;
 use Hopheartsceo\PostmanExporter\Contracts\RouteScannerInterface;
 use Illuminate\Routing\Route;
 use Illuminate\Routing\Router;
+use ReflectionMethod;
 
 /**
- * Scans Laravel routes and extracts structured route information.
+ * Scans Laravel routes and extracts structured route information,
+ * including controller method metadata for response extraction.
  */
 class RouteScannerService implements RouteScannerInterface
 
@@ -34,6 +36,9 @@ class RouteScannerService implements RouteScannerInterface
      *     prefix: string,
      *     parameters: array<int, string>,
      *     is_api: bool,
+     *     return_type: string|null,
+     *     phpdoc: string|null,
+     *     uses_api_resource: bool,
      * }>
      */
     public function scan(): array
@@ -77,6 +82,18 @@ class RouteScannerService implements RouteScannerInterface
         $parameters = $route->parameterNames();
         $isApi = str_starts_with($uri, 'api') || in_array('api', $middleware, true);
 
+        // Extract controller method metadata for response building
+        $returnType = null;
+        $phpdoc = null;
+        $usesApiResource = false;
+
+        if ($controller && $controllerMethod && class_exists($controller)) {
+            $methodMeta = $this->extractMethodMetadata($controller, $controllerMethod);
+            $returnType = $methodMeta['return_type'];
+            $phpdoc = $methodMeta['phpdoc'];
+            $usesApiResource = $methodMeta['uses_api_resource'];
+        }
+
         return [
             'method' => $methods[0] ?? 'GET',
             'methods' => array_values($methods),
@@ -89,7 +106,80 @@ class RouteScannerService implements RouteScannerInterface
             'prefix' => $prefix,
             'parameters' => $parameters,
             'is_api' => $isApi,
+            'return_type' => $returnType,
+            'phpdoc' => $phpdoc,
+            'uses_api_resource' => $usesApiResource,
         ];
+    }
+
+    /**
+     * Extract metadata from a controller method (return type, PHPDoc, resource usage).
+     *
+     * @return array{return_type: string|null, phpdoc: string|null, uses_api_resource: bool}
+     */
+    protected function extractMethodMetadata(string $controller, string $method): array
+    {
+        $meta = [
+            'return_type' => null,
+            'phpdoc' => null,
+            'uses_api_resource' => false,
+        ];
+
+        try {
+            $reflection = new ReflectionMethod($controller, $method);
+
+            // Return type
+            $returnType = $reflection->getReturnType();
+            if ($returnType instanceof \ReflectionNamedType) {
+                $meta['return_type'] = $returnType->getName();
+            }
+
+            // PHPDoc
+            $docComment = $reflection->getDocComment();
+            if ($docComment !== false) {
+                $meta['phpdoc'] = $docComment;
+            }
+
+            // Check source for API Resource usage
+            $source = $this->getMethodSource($reflection);
+            if ($source !== null) {
+                $meta['uses_api_resource'] = (bool) preg_match(
+                    '/(?:new\s+\w+Resource|Resource::collection)\s*\(/',
+                    $source
+                );
+            }
+        } catch (\Throwable) {
+            // Silently fail
+        }
+
+        return $meta;
+    }
+
+    /**
+     * Get source code of a method.
+     */
+    protected function getMethodSource(ReflectionMethod $method): ?string
+    {
+        try {
+            $filename = $method->getFileName();
+            $startLine = $method->getStartLine();
+            $endLine = $method->getEndLine();
+
+            if (! $filename || ! $startLine || ! $endLine) {
+                return null;
+            }
+
+            $source = file_get_contents($filename);
+            if ($source === false) {
+                return null;
+            }
+
+            $lines = array_slice(explode("\n", $source), $startLine - 1, $endLine - $startLine + 1);
+
+            return implode("\n", $lines);
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     /**
