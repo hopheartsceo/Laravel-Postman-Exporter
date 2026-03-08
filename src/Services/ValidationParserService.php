@@ -184,7 +184,7 @@ class ValidationParserService implements ValidationParserInterface
         foreach ($keys as $i => $segment) {
             if ($segment === '*') {
                 // Create an array with one example item
-                if (! isset($current[0])) {
+                if (! isset($current[0]) || ! is_array($current[0])) {
                     $current[0] = [];
                 }
                 $remaining = array_slice($keys, $i + 1);
