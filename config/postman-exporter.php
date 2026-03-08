@@ -121,11 +121,21 @@ return [
     | into one Postman folder. Routes without a prefix go into the
     | fallback folder. No nested folders are created.
     |
+    | strip_prefixes: Boilerplate URI prefixes that should be stripped
+    |   before determining the folder name. Longer prefixes are matched
+    |   first. Defaults: api/v1, api/v2, api/v3, api.
+    |
     */
     'grouping' => [
         'enabled' => true,
         'strategy' => 'prefix',
         'fallback_folder' => 'general',
+        'strip_prefixes' => [
+            'api/v1',
+            'api/v2',
+            'api/v3',
+            'api',
+        ],
     ],
 
     /*

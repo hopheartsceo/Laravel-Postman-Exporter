@@ -147,18 +147,18 @@ class PostmanCollectionBuilderTest extends TestCase
         $this->assertContains('token', $keys);
     }
 
-    public function test_routes_are_grouped_by_first_prefix_segment(): void
+    public function test_routes_are_grouped_by_meaningful_prefix(): void
     {
         $collection = $this->builder->build($this->getSampleRoutes());
 
         $items = $collection['item'];
 
-        // All sample routes start with "api/..." so one folder: "api"
-        $this->assertCount(1, $items);
-        $this->assertEquals('api', $items[0]['name']);
+        // After stripping "api", sample routes group into "users" and "posts"
+        $this->assertCount(2, $items);
 
-        // "api" folder should contain 4 request items (flat, no sub-folders)
-        $this->assertCount(4, $items[0]['item']);
+        $folderNames = array_column($items, 'name');
+        $this->assertContains('users', $folderNames);
+        $this->assertContains('posts', $folderNames);
     }
 
     public function test_no_root_level_requests(): void
@@ -174,9 +174,16 @@ class PostmanCollectionBuilderTest extends TestCase
     {
         $collection = $this->builder->build($this->getSampleRoutes());
 
-        // Navigate to the first request in the "api" folder
-        $apiFolder = $collection['item'][0];
-        $firstRequest = $apiFolder['item'][0];
+        // Navigate to the first request in the "users" folder
+        $usersFolder = null;
+        foreach ($collection['item'] as $folder) {
+            if ($folder['name'] === 'users') {
+                $usersFolder = $folder;
+                break;
+            }
+        }
+        $this->assertNotNull($usersFolder);
+        $firstRequest = $usersFolder['item'][0];
 
         $this->assertArrayHasKey('name', $firstRequest);
         $this->assertArrayHasKey('request', $firstRequest);
@@ -189,8 +196,15 @@ class PostmanCollectionBuilderTest extends TestCase
     {
         $collection = $this->builder->build($this->getSampleRoutes());
 
-        $apiFolder = $collection['item'][0];
-        $firstRequest = $apiFolder['item'][0];
+        $usersFolder = null;
+        foreach ($collection['item'] as $folder) {
+            if ($folder['name'] === 'users') {
+                $usersFolder = $folder;
+                break;
+            }
+        }
+        $this->assertNotNull($usersFolder);
+        $firstRequest = $usersFolder['item'][0];
         $url = $firstRequest['request']['url'];
 
         $this->assertArrayHasKey('raw', $url);

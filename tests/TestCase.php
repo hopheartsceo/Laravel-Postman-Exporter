@@ -69,6 +69,7 @@ abstract class TestCase extends OrchestraTestCase
             'enabled' => true,
             'strategy' => 'prefix',
             'fallback_folder' => 'general',
+            'strip_prefixes' => ['api/v1', 'api/v2', 'api/v3', 'api'],
         ]);
         $app['config']->set('postman-exporter.responses', [
             'enabled' => true,

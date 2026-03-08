@@ -9,18 +9,32 @@ use Hopheartsceo\PostmanExporter\Contracts\FolderOrganizerInterface;
 /**
  * Organizes routes into folder groups based on URI prefix.
  *
- * All routes sharing the same first URI prefix segment are grouped into one folder.
- * Routes without a prefix go into a configurable fallback folder (default: "general").
- * No nested folders are created — only flat, single-level grouping.
+ * Common boilerplate prefixes (like "api", "api/v1", "api/v2") are automatically
+ * stripped so routes are grouped by the first *meaningful* segment — typically
+ * the resource or domain name (e.g. "camps", "admin", "auth").
+ *
+ * Routes without a meaningful segment after stripping go into a configurable
+ * fallback folder (default: "general"). No nested folders are created.
  */
 class FolderOrganizerService implements FolderOrganizerInterface
 {
+    /**
+     * Prefixes that should be stripped before resolving the folder name.
+     * Longer prefixes are matched first so "api/v1" is stripped before "api".
+     */
+    protected const STRIP_PREFIXES = [
+        'api/v1',
+        'api/v2',
+        'api/v3',
+        'api',
+    ];
+
     public function __construct(
         protected array $config,
     ) {}
 
     /**
-     * Organize routes into a flat folder structure grouped by first URI prefix segment.
+     * Organize routes into a flat folder structure grouped by meaningful prefix.
      *
      * @param  array<int, array<string, mixed>>  $routes
      * @param  callable  $requestBuilder
@@ -36,12 +50,13 @@ class FolderOrganizerService implements FolderOrganizerInterface
         }
 
         $fallbackFolder = $groupingConfig['fallback_folder'] ?? 'general';
+        $stripPrefixes = $groupingConfig['strip_prefixes'] ?? self::STRIP_PREFIXES;
 
-        // Group routes by their first prefix segment
+        // Group routes by their first meaningful segment
         $groups = [];
 
         foreach ($routes as $route) {
-            $folderName = $this->resolveFolderName($route, $fallbackFolder);
+            $folderName = $this->resolveFolderName($route, $fallbackFolder, $stripPrefixes);
 
             if (! isset($groups[$folderName])) {
                 $groups[$folderName] = [];
@@ -55,13 +70,17 @@ class FolderOrganizerService implements FolderOrganizerInterface
     }
 
     /**
-     * Resolve the folder name for a route based on its first URI prefix segment.
+     * Resolve the folder name for a route.
      *
-     * A route is considered "prefixed" only if it has more than one segment
-     * (e.g. "api/users" → prefix "api"). Single-segment routes like "status"
-     * have no prefix and go into the fallback folder.
+     * Steps:
+     * 1. Strip known boilerplate prefixes (api, api/v1, etc.)
+     * 2. Take the first segment of what remains as the folder name.
+     * 3. If nothing meaningful remains, use the fallback folder.
+     *
+     * @param  array<string, mixed>  $route
+     * @param  string[]  $stripPrefixes
      */
-    protected function resolveFolderName(array $route, string $fallbackFolder): string
+    protected function resolveFolderName(array $route, string $fallbackFolder, array $stripPrefixes): string
     {
         $uri = trim($route['uri'] ?? '', '/');
 
@@ -69,21 +88,58 @@ class FolderOrganizerService implements FolderOrganizerInterface
             return $fallbackFolder;
         }
 
-        $segments = explode('/', $uri);
+        // Strip known boilerplate prefixes (longest match first)
+        $stripped = $this->stripBoilerplatePrefixes($uri, $stripPrefixes);
 
-        // Single-segment routes have no prefix — use fallback
-        if (count($segments) < 2) {
+        if (empty($stripped)) {
             return $fallbackFolder;
         }
 
+        $segments = explode('/', $stripped);
         $firstSegment = $segments[0] ?? '';
 
-        // If first segment is empty or looks like a parameter, use fallback
+        // If first segment is empty, a parameter, or the only segment left
+        // and it IS a parameter, use fallback
         if (empty($firstSegment) || preg_match('/^[\{:]/', $firstSegment)) {
             return $fallbackFolder;
         }
 
+        // Single-segment routes (after stripping) go to fallback only if
+        // the segment is a parameter. Otherwise they form their own folder.
+        // e.g. "api/v1/login" → stripped "login" → folder "auth" is tricky;
+        // but "api/v1/camps" → stripped "camps" → folder "camps" ✓
+        // For single-segment we still use the segment as a folder.
         return $firstSegment;
+    }
+
+    /**
+     * Strip known boilerplate prefixes from a URI.
+     *
+     * @param  string[]  $prefixes  Sorted longest-first for greedy matching.
+     */
+    protected function stripBoilerplatePrefixes(string $uri, array $prefixes): string
+    {
+        // Sort by length descending so longer prefixes match first
+        usort($prefixes, fn (string $a, string $b) => strlen($b) <=> strlen($a));
+
+        foreach ($prefixes as $prefix) {
+            $prefix = trim($prefix, '/');
+
+            if ($prefix === '') {
+                continue;
+            }
+
+            if (str_starts_with($uri, $prefix . '/')) {
+                return trim(substr($uri, strlen($prefix)), '/');
+            }
+
+            // Exact match (URI IS the prefix with nothing after it)
+            if ($uri === $prefix) {
+                return '';
+            }
+        }
+
+        return $uri;
     }
 
     /**

@@ -215,21 +215,46 @@ class PostmanCollectionBuilderService implements CollectionBuilderInterface
 
     /**
      * Generate a human-readable name for a request.
+     *
+     * Strategy:
+     * 1. Find the last non-parameter segment (the resource name).
+     * 2. Humanize it ("need-types" → "Need types").
+     * 3. Prefix with the HTTP method.
+     *
+     * For routes where all trailing segments are parameters (e.g. /camps/{camp}),
+     * we walk backwards to find the resource segment.
      */
     protected function generateRequestName(string $method, string $uri): string
     {
-        $segments = array_filter(explode('/', $uri));
-        $lastSegment = end($segments) ?: $uri;
+        $segments = array_values(array_filter(explode('/', $uri)));
 
-        // Clean up parameter segments
-        $lastSegment = preg_replace('/\{.*?}/', '', $lastSegment);
-        $lastSegment = trim($lastSegment, '/');
+        // Walk backwards to find the last non-parameter, non-boilerplate segment
+        $resourceSegment = null;
+        $boilerplate = ['api', 'v1', 'v2', 'v3'];
 
-        if (empty($lastSegment)) {
-            $lastSegment = implode('/', array_slice(array_values($segments), 0, 3));
+        for ($i = count($segments) - 1; $i >= 0; $i--) {
+            $seg = $segments[$i];
+
+            // Skip route parameters
+            if (str_starts_with($seg, '{')) {
+                continue;
+            }
+
+            // Skip boilerplate
+            if (in_array(strtolower($seg), $boilerplate, true)) {
+                continue;
+            }
+
+            $resourceSegment = $seg;
+            break;
         }
 
-        $name = ucfirst(str_replace(['-', '_'], ' ', $lastSegment));
+        if ($resourceSegment === null) {
+            $resourceSegment = end($segments) ?: $uri;
+            $resourceSegment = preg_replace('/\{.*?}/', '', $resourceSegment);
+        }
+
+        $name = ucfirst(str_replace(['-', '_'], ' ', $resourceSegment));
 
         return $method . ' ' . $name;
     }
