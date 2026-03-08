@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace Wessaal\PostmanExporter\Tests\Feature;
+namespace Hopheartsceo\PostmanExporter\Tests\Feature;
 
-use Wessaal\PostmanExporter\Services\ExampleDataGeneratorService;
-use Wessaal\PostmanExporter\Services\RequestAnalyzerService;
-use Wessaal\PostmanExporter\Services\ValidationParserService;
-use Wessaal\PostmanExporter\Tests\TestCase;
+use Hopheartsceo\PostmanExporter\Services\ExampleDataGeneratorService;
+use Hopheartsceo\PostmanExporter\Services\RequestAnalyzerService;
+use Hopheartsceo\PostmanExporter\Services\ValidationParserService;
+use Hopheartsceo\PostmanExporter\Tests\TestCase;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\Request;
 

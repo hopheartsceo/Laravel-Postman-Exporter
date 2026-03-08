@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Wessaal\PostmanExporter\Services;
+namespace Hopheartsceo\PostmanExporter\Services;
 
-use Wessaal\PostmanExporter\Contracts\CollectionBuilderInterface;
+use Hopheartsceo\PostmanExporter\Contracts\CollectionBuilderInterface;
 
 /**
  * Builds a Postman Collection v2.1 JSON structure from analyzed route data.

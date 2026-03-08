@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Wessaal\PostmanExporter\Services;
+namespace Hopheartsceo\PostmanExporter\Services;
 
-use Wessaal\PostmanExporter\Contracts\RouteScannerInterface;
+use Hopheartsceo\PostmanExporter\Contracts\RouteScannerInterface;
 use Illuminate\Routing\Route;
 use Illuminate\Routing\Router;
 

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Wessaal\PostmanExporter\Facades;
+namespace Hopheartsceo\PostmanExporter\Facades;
 
 use Illuminate\Support\Facades\Facade;
 
@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Facade;
  * @method static array upload(?string $apiKey = null)
  * @method static array|null getCollection()
  *
- * @see \Wessaal\PostmanExporter\PostmanExporterManager
+ * @see \Hopheartsceo\PostmanExporter\PostmanExporterManager
  */
 class PostmanExporter extends Facade
 {

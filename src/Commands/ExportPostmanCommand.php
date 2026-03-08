@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace Wessaal\PostmanExporter\Commands;
+namespace Hopheartsceo\PostmanExporter\Commands;
 
-use Wessaal\PostmanExporter\PostmanExporterManager;
-use Wessaal\PostmanExporter\Services\PostmanUploaderService;
-use Wessaal\PostmanExporter\Services\RouteScannerService;
+use Hopheartsceo\PostmanExporter\PostmanExporterManager;
+use Hopheartsceo\PostmanExporter\Services\PostmanUploaderService;
+use Hopheartsceo\PostmanExporter\Services\RouteScannerService;
 use Illuminate\Console\Command;
 
 /**

@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Wessaal\PostmanExporter\Tests;
+namespace Hopheartsceo\PostmanExporter\Tests;
 
-use Wessaal\PostmanExporter\PostmanExporterServiceProvider;
+use Hopheartsceo\PostmanExporter\PostmanExporterServiceProvider;
 use Orchestra\Testbench\TestCase as OrchestraTestCase;
 
 abstract class TestCase extends OrchestraTestCase
@@ -31,7 +31,7 @@ abstract class TestCase extends OrchestraTestCase
     protected function getPackageAliases($app): array
     {
         return [
-            'PostmanExporter' => \Wessaal\PostmanExporter\Facades\PostmanExporter::class,
+            'PostmanExporter' => \Hopheartsceo\PostmanExporter\Facades\PostmanExporter::class,
         ];
     }
 

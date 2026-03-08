@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Wessaal\PostmanExporter\Services;
+namespace Hopheartsceo\PostmanExporter\Services;
 
-use Wessaal\PostmanExporter\Contracts\ExampleDataGeneratorInterface;
+use Hopheartsceo\PostmanExporter\Contracts\ExampleDataGeneratorInterface;
 
 /**
  * Generates realistic example data based on validation rules.

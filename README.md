@@ -25,7 +25,7 @@ Automatically generate **Postman Collection v2.1** files from your Laravel appli
 You can install the package via composer:
 
 ```bash
-composer require wessaal/laravel-postman-exporter --dev
+composer require hopheartsceo/laravel-postman-exporter --dev
 ```
 
 ### Installation from GitHub (Development)
@@ -36,11 +36,11 @@ If you haven't published to Packagist yet, add this to your `composer.json`:
 "repositories": [
     {
         "type": "vcs",
-        "url": "https://github.com/wessaal/laravel-postman-exporter"
+        "url": "https://github.com/hopheartsceo/laravel-postman-exporter"
     }
 ],
 "require": {
-    "wessaal/laravel-postman-exporter": "dev-main"
+    "hopheartsceo/laravel-postman-exporter": "dev-main"
 }
 ```
 
@@ -76,7 +76,7 @@ php artisan postman:export --upload --api-key=your-postman-api-key
 ### Facade API
 
 ```php
-use Wessaal\PostmanExporter\Facades\PostmanExporter;
+use Hopheartsceo\PostmanExporter\Facades\PostmanExporter;
 
 // Generate and get array
 $collection = PostmanExporter::generate();

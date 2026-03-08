@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Wessaal\PostmanExporter\Tests\Feature;
+namespace Hopheartsceo\PostmanExporter\Tests\Feature;
 
-use Wessaal\PostmanExporter\Services\RouteScannerService;
-use Wessaal\PostmanExporter\Tests\TestCase;
+use Hopheartsceo\PostmanExporter\Services\RouteScannerService;
+use Hopheartsceo\PostmanExporter\Tests\TestCase;
 use Illuminate\Support\Facades\Route;
 
 class RouteScannerTest extends TestCase

@@ -1,5 +1,5 @@
 {
-    "name": "wessaal/laravel-postman-exporter",
+    "name": "hopheartsceo/laravel-postman-exporter",
     "description": "Automatically generate Postman v2.1 collections from your Laravel application routes, controllers, and FormRequest validations.",
     "keywords": [
         "laravel",
@@ -32,21 +32,21 @@
     },
     "autoload": {
         "psr-4": {
-            "Wessaal\\PostmanExporter\\": "src/"
+            "Hopheartsceo\\PostmanExporter\\": "src/"
         }
     },
     "autoload-dev": {
         "psr-4": {
-            "Wessaal\\PostmanExporter\\Tests\\": "tests/"
+            "Hopheartsceo\\PostmanExporter\\Tests\\": "tests/"
         }
     },
     "extra": {
         "laravel": {
             "providers": [
-                "Wessaal\\PostmanExporter\\PostmanExporterServiceProvider"
+                "Hopheartsceo\\PostmanExporter\\PostmanExporterServiceProvider"
             ],
             "aliases": {
-                "PostmanExporter": "Wessaal\\PostmanExporter\\Facades\\PostmanExporter"
+                "PostmanExporter": "Hopheartsceo\\PostmanExporter\\Facades\\PostmanExporter"
             }
         }
     },

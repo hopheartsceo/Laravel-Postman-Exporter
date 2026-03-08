@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Wessaal\PostmanExporter\Services;
+namespace Hopheartsceo\PostmanExporter\Services;
 
-use Wessaal\PostmanExporter\Contracts\UploaderInterface;
+use Hopheartsceo\PostmanExporter\Contracts\UploaderInterface;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\GuzzleException;
 

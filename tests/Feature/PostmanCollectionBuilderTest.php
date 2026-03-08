@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Wessaal\PostmanExporter\Tests\Feature;
+namespace Hopheartsceo\PostmanExporter\Tests\Feature;
 
-use Wessaal\PostmanExporter\Services\PostmanCollectionBuilderService;
-use Wessaal\PostmanExporter\Tests\TestCase;
+use Hopheartsceo\PostmanExporter\Services\PostmanCollectionBuilderService;
+use Hopheartsceo\PostmanExporter\Tests\TestCase;
 
 class PostmanCollectionBuilderTest extends TestCase
 {

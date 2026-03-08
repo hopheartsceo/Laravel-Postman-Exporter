@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Wessaal\PostmanExporter\Tests\Feature;
+namespace Hopheartsceo\PostmanExporter\Tests\Feature;
 
-use Wessaal\PostmanExporter\Tests\TestCase;
+use Hopheartsceo\PostmanExporter\Tests\TestCase;
 
 class ExportCommandTest extends TestCase
 {

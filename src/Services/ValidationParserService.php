@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Wessaal\PostmanExporter\Services;
+namespace Hopheartsceo\PostmanExporter\Services;
 
-use Wessaal\PostmanExporter\Contracts\ValidationParserInterface;
+use Hopheartsceo\PostmanExporter\Contracts\ValidationParserInterface;
 
 /**
  * Parses Laravel validation rules into structured format.

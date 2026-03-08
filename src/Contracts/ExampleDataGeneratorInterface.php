@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Wessaal\PostmanExporter\Contracts;
+namespace Hopheartsceo\PostmanExporter\Contracts;
 
 /**
  * Contract for example data generation services.

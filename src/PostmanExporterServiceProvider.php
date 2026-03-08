@@ -2,15 +2,15 @@
 
 declare(strict_types=1);
 
-namespace Wessaal\PostmanExporter;
+namespace Hopheartsceo\PostmanExporter;
 
-use Wessaal\PostmanExporter\Commands\ExportPostmanCommand;
-use Wessaal\PostmanExporter\Services\ExampleDataGeneratorService;
-use Wessaal\PostmanExporter\Services\PostmanCollectionBuilderService;
-use Wessaal\PostmanExporter\Services\PostmanUploaderService;
-use Wessaal\PostmanExporter\Services\RequestAnalyzerService;
-use Wessaal\PostmanExporter\Services\RouteScannerService;
-use Wessaal\PostmanExporter\Services\ValidationParserService;
+use Hopheartsceo\PostmanExporter\Commands\ExportPostmanCommand;
+use Hopheartsceo\PostmanExporter\Services\ExampleDataGeneratorService;
+use Hopheartsceo\PostmanExporter\Services\PostmanCollectionBuilderService;
+use Hopheartsceo\PostmanExporter\Services\PostmanUploaderService;
+use Hopheartsceo\PostmanExporter\Services\RequestAnalyzerService;
+use Hopheartsceo\PostmanExporter\Services\RouteScannerService;
+use Hopheartsceo\PostmanExporter\Services\ValidationParserService;
 use Illuminate\Support\ServiceProvider;
 
 class PostmanExporterServiceProvider extends ServiceProvider

@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace Wessaal\PostmanExporter\Tests\Feature;
+namespace Hopheartsceo\PostmanExporter\Tests\Feature;
 
-use Wessaal\PostmanExporter\Services\ExampleDataGeneratorService;
-use Wessaal\PostmanExporter\Services\ValidationParserService;
-use Wessaal\PostmanExporter\Tests\TestCase;
+use Hopheartsceo\PostmanExporter\Services\ExampleDataGeneratorService;
+use Hopheartsceo\PostmanExporter\Services\ValidationParserService;
+use Hopheartsceo\PostmanExporter\Tests\TestCase;
 
 class ValidationParserTest extends TestCase
 {
