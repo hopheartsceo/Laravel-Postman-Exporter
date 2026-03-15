@@ -109,25 +109,26 @@ class RequestAnalyzerService implements RequestAnalyzerInterface
             $rules = $this->extractInlineValidation($reflection);
         }
 
-        if (! empty($rules)) {
-            $parsedFields = $this->validationParser->parse($rules);
-            $exampleBody = $this->validationParser->buildExampleBody($parsedFields);
+            if (! empty($rules)) {
+                $parsedFields = $this->validationParser->parse($rules);
+                $routeData['body_params_parsed'] = $parsedFields; // Store for OpenAPI
+                $exampleBody = $this->validationParser->buildExampleBody($parsedFields);
 
-            $httpMethod = strtoupper($routeData['method']);
+                $httpMethod = strtoupper($routeData['method']);
 
-            if (in_array($httpMethod, ['GET', 'DELETE'], true)) {
-                // GET/DELETE → query params
-                foreach ($parsedFields as $field => $info) {
-                    $routeData['query_params'][$field] = [
-                        'value' => (string) $info['example'],
-                        'description' => $this->buildParamDescription($field, $info),
-                    ];
+                if (in_array($httpMethod, ['GET', 'DELETE'], true)) {
+                    // GET/DELETE → query params
+                    foreach ($parsedFields as $field => $info) {
+                        $routeData['query_params'][$field] = [
+                            'value' => (string) $info['example'],
+                            'description' => $this->buildParamDescription($field, $info),
+                        ];
+                    }
+                } else {
+                    // POST/PUT/PATCH → body params
+                    $routeData['body_params'] = $exampleBody;
                 }
-            } else {
-                // POST/PUT/PATCH → body params
-                $routeData['body_params'] = $exampleBody;
             }
-        }
     }
 
     /**

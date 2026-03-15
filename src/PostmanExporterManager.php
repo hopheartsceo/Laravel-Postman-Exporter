@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Hopheartsceo\PostmanExporter;
 
+use Hopheartsceo\PostmanExporter\Services\OpenApiExporterService;
 use Hopheartsceo\PostmanExporter\Services\PostmanCollectionBuilderService;
 use Hopheartsceo\PostmanExporter\Services\PostmanUploaderService;
 use Hopheartsceo\PostmanExporter\Services\RequestAnalyzerService;
@@ -22,16 +23,18 @@ class PostmanExporterManager
         protected RouteScannerService $routeScanner,
         protected RequestAnalyzerService $requestAnalyzer,
         protected PostmanCollectionBuilderService $collectionBuilder,
+        protected OpenApiExporterService $openApiBuilder,
         protected PostmanUploaderService $uploader,
         protected array $config,
     ) {}
 
     /**
-     * Generate the Postman collection array.
+     * Generate the collection array.
      *
+     * @param  string  $format  'postman' or 'openapi'
      * @return array<string, mixed>
      */
-    public function generate(): array
+    public function generate(string $format = 'postman'): array
     {
         $routes = $this->routeScanner->scan();
 
@@ -40,7 +43,11 @@ class PostmanExporterManager
             $analyzedRoutes[] = $this->requestAnalyzer->analyze($route);
         }
 
-        $this->collection = $this->collectionBuilder->build($analyzedRoutes);
+        if ($format === 'openapi') {
+            $this->collection = $this->openApiBuilder->build($analyzedRoutes);
+        } else {
+            $this->collection = $this->collectionBuilder->build($analyzedRoutes);
+        }
 
         return $this->collection;
     }

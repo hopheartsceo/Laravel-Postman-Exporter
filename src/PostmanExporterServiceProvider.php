@@ -5,9 +5,13 @@ declare(strict_types=1);
 namespace Hopheartsceo\PostmanExporter;
 
 use Hopheartsceo\PostmanExporter\Commands\ExportPostmanCommand;
+use Hopheartsceo\PostmanExporter\Builders\OpenApiDocumentBuilder;
+use Hopheartsceo\PostmanExporter\Builders\OpenApiPathBuilder;
+use Hopheartsceo\PostmanExporter\Mappers\ValidationToJsonSchemaMapper;
 use Hopheartsceo\PostmanExporter\Services\ExampleDataGeneratorService;
 use Hopheartsceo\PostmanExporter\Services\ExampleResponseGeneratorService;
 use Hopheartsceo\PostmanExporter\Services\FolderOrganizerService;
+use Hopheartsceo\PostmanExporter\Services\OpenApiExporterService;
 use Hopheartsceo\PostmanExporter\Services\PostmanCollectionBuilderService;
 use Hopheartsceo\PostmanExporter\Services\PostmanUploaderService;
 use Hopheartsceo\PostmanExporter\Services\RequestAnalyzerService;
@@ -88,6 +92,29 @@ class PostmanExporterServiceProvider extends ServiceProvider
             );
         });
 
+        $this->app->singleton(ValidationToJsonSchemaMapper::class, function () {
+            return new ValidationToJsonSchemaMapper();
+        });
+
+        $this->app->singleton(OpenApiPathBuilder::class, function ($app) {
+            return new OpenApiPathBuilder(
+                $app->make(ValidationToJsonSchemaMapper::class)
+            );
+        });
+
+        $this->app->singleton(OpenApiDocumentBuilder::class, function ($app) {
+            return new OpenApiDocumentBuilder(
+                $app->make(OpenApiPathBuilder::class),
+                $app['config']->get('postman-exporter')
+            );
+        });
+
+        $this->app->singleton(OpenApiExporterService::class, function ($app) {
+            return new OpenApiExporterService(
+                $app->make(OpenApiDocumentBuilder::class)
+            );
+        });
+
         $this->app->singleton(PostmanUploaderService::class, function () {
             return new PostmanUploaderService();
         });
@@ -97,6 +124,7 @@ class PostmanExporterServiceProvider extends ServiceProvider
                 $app->make(RouteScannerService::class),
                 $app->make(RequestAnalyzerService::class),
                 $app->make(PostmanCollectionBuilderService::class),
+                $app->make(OpenApiExporterService::class),
                 $app->make(PostmanUploaderService::class),
                 $app['config']->get('postman-exporter')
             );

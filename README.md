@@ -4,7 +4,7 @@
 [![PHP](https://img.shields.io/badge/PHP-8.1%2B-blue.svg)](https://php.net)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-Automatically generate **Postman Collection v2.1** files from your Laravel application routes, controllers, and FormRequest validations — complete with **flat folder grouping** and **response examples**.
+Automatically generate **Postman Collection v2.1** files and **OpenAPI 3.0** specifications from your Laravel application routes, controllers, and FormRequest validations — complete with **hierarchical folder grouping** and **response examples**.
 
 ---
 
@@ -14,8 +14,9 @@ Automatically generate **Postman Collection v2.1** files from your Laravel appli
 - 📝 **Request Analysis** — Extracts validation rules from FormRequest classes and inline `$request->validate()` calls
 - 🎯 **Smart Example Data** — Generates realistic sample values based on validation rules and field names
 - 🔐 **Authentication Detection** — Automatically adds auth headers based on middleware (Sanctum, Passport, etc.)
-- 📁 **Flat Folder Grouping** — Organizes requests into single-level folders by the first URI segment (no nesting)
+- 📁 **Hierarchical Grouping** — Organizes requests into nested folders based on route prefixes
 - 📋 **Response Examples** — Extracts response structures from PHPDoc, API Resources, `response()->json()`, and Eloquent models
+- 📄 **OpenAPI Support** — Export your API as a valid OpenAPI 3.0.3 specification
 - 🚀 **Postman Upload** — Optionally upload collections directly via the Postman API
 - ⚡ **Artisan Command** — Beautiful CLI with progress indicators and colored output
 
@@ -58,26 +59,20 @@ php artisan vendor:publish --tag=postman-exporter-config
 ### Artisan Command
 
 ```bash
-# Basic export
+# Export as Postman Collection (default)
 php artisan postman:export
 
-# Custom output path
-php artisan postman:export --output=./docs/api-collection.json
+# Export as OpenAPI 3.0 specification
+php artisan postman:export --format=openapi
 
-# Group routes by prefix
+# Custom output path
+php artisan postman:export --output=./docs/api-spec.json
+
+# Group routes by prefix (works for both formats)
 php artisan postman:export --group-by-prefix
 
-# Include response examples
+# Include response examples (Postman only currently)
 php artisan postman:export --with-responses
-
-# Combine options
-php artisan postman:export --group-by-prefix --with-responses
-
-# Include web routes
-php artisan postman:export --include-web-routes
-
-# Upload to Postman
-php artisan postman:export --upload --api-key=your-postman-api-key
 ```
 
 ### Facade API
@@ -85,8 +80,11 @@ php artisan postman:export --upload --api-key=your-postman-api-key
 ```php
 use Hopheartsceo\PostmanExporter\Facades\PostmanExporter;
 
-// Generate and get array
+// Generate Postman Collection (default)
 $collection = PostmanExporter::generate();
+
+// Generate OpenAPI spec
+$openapi = PostmanExporter::generate('openapi');
 
 // Generate and save to file
 $path = PostmanExporter::save('/path/to/collection.json');

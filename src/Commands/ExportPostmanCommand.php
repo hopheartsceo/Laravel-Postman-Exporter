@@ -19,6 +19,7 @@ class ExportPostmanCommand extends Command
      */
     protected $signature = 'postman:export
         {--output= : Custom output file path}
+        {--format=postman : Export format (postman or openapi)}
         {--group-by-prefix : Group routes into folders by prefix}
         {--include-web-routes : Include web (non-API) routes}
         {--with-responses : Include response examples in the collection}
@@ -28,7 +29,7 @@ class ExportPostmanCommand extends Command
     /**
      * The console command description.
      */
-    protected $description = 'Generate a Postman Collection v2.1 from your Laravel routes';
+    protected $description = 'Generate a Postman Collection or OpenAPI spec from your Laravel routes';
 
     /**
      * Execute the console command.
@@ -39,8 +40,14 @@ class ExportPostmanCommand extends Command
     ): int
     {
         $this->newLine();
-        $this->components->info('🚀 Laravel Postman Exporter');
+        $this->components->info('🚀 Laravel Postman & OpenAPI Exporter');
         $this->newLine();
+
+        $format = $this->option('format');
+        if (! in_array($format, ['postman', 'openapi'])) {
+            $this->error("Invalid format: {$format}. Supported: postman, openapi");
+            return self::FAILURE;
+        }
 
         // Apply CLI overrides to config
         $this->applyOptions();
@@ -52,9 +59,9 @@ class ExportPostmanCommand extends Command
         });
 
         // Step 2: Generate collection
-        $this->components->task('Analyzing controllers & building collection', function () use ($manager) {
+        $this->components->task('Analyzing controllers & building specification', function () use ($manager, $format) {
             try {
-                $manager->generate();
+                $manager->generate($format);
                 return true;
             } catch (\Throwable $e) {
                 $this->error('  Error: ' . $e->getMessage());
@@ -65,12 +72,12 @@ class ExportPostmanCommand extends Command
         $collection = $manager->getCollection();
 
         if ($collection === null) {
-            $this->components->error('Failed to generate collection.');
+            $this->components->error('Failed to generate specification.');
             return self::FAILURE;
         }
 
         // Count items
-        $itemCount = $this->countItems($collection['item'] ?? []);
+        $itemCount = $this->countItems($collection, $format);
         $this->components->info("  Found {$itemCount} route(s)");
 
         // Show response status
@@ -81,7 +88,13 @@ class ExportPostmanCommand extends Command
         $this->newLine();
 
         // Step 3: Save file
-        $outputPath = $this->option('output') ?? config('postman-exporter.output_path');
+        $outputPath = $this->option('output');
+        if (! $outputPath) {
+            $outputPath = config('postman-exporter.output_path');
+            if ($format === 'openapi' && str_ends_with($outputPath, 'postman-collection.json')) {
+                $outputPath = str_replace('postman-collection.json', 'openapi.json', $outputPath);
+            }
+        }
 
         $this->components->task('Saving collection', function () use ($manager, $outputPath) {
             try {
@@ -144,18 +157,35 @@ class ExportPostmanCommand extends Command
     }
 
     /**
-     * Count total request items in the collection (recursive for folders).
+     * Count total request items in the collection (recursive for folders or path items).
      *
-     * @param  array<int, array<string, mixed>>  $items
+     * @param  array<string, mixed>  $data
+     * @param  string  $format
      */
-    protected function countItems(array $items): int
+    protected function countItems(array $data, string $format = 'postman'): int
+    {
+        if ($format === 'openapi') {
+            $count = 0;
+            foreach ($data['paths'] ?? [] as $methods) {
+                $count += count($methods);
+            }
+            return $count;
+        }
+
+        return $this->countPostmanItems($data['item'] ?? []);
+    }
+
+    /**
+     * Count Postman items recursively.
+     */
+    protected function countPostmanItems(array $items): int
     {
         $count = 0;
 
         foreach ($items as $item) {
             if (isset($item['item'])) {
                 // It's a folder
-                $count += $this->countItems($item['item']);
+                $count += $this->countPostmanItems($item['item']);
             } else {
                 $count++;
             }
