@@ -160,9 +160,7 @@ return [
     'responses' => [
         'enabled' => true,
         'fallback_status' => 200,
-        'fallback_body' => [
-            'message' => 'Success',
-        ],
+        'fallback_body' => null,
     ],
 
     /*

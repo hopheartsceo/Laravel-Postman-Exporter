@@ -41,7 +41,8 @@ class PostmanExporterServiceProvider extends ServiceProvider
 
         $this->app->singleton(ValidationParserService::class, function ($app) {
             return new ValidationParserService(
-                $app->make(ExampleDataGeneratorService::class)
+                $app->make(ExampleDataGeneratorService::class),
+                $app->make(ValidationToJsonSchemaMapper::class)
             );
         });
 
@@ -98,7 +99,8 @@ class PostmanExporterServiceProvider extends ServiceProvider
 
         $this->app->singleton(OpenApiPathBuilder::class, function ($app) {
             return new OpenApiPathBuilder(
-                $app->make(ValidationToJsonSchemaMapper::class)
+                $app->make(ValidationToJsonSchemaMapper::class),
+                $app->make(ResponseExtractorService::class)
             );
         });
 

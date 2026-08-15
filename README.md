@@ -4,20 +4,20 @@
 [![PHP](https://img.shields.io/badge/PHP-8.1%2B-blue.svg)](https://php.net)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-Automatically generate **Postman Collection v2.1** files and **OpenAPI 3.0** specifications from your Laravel application routes, controllers, and FormRequest validations — complete with **hierarchical folder grouping** and **response examples**.
+Automatically generate **Postman Collection v2.1** files and **OpenAPI 3.0** specifications from your Laravel application routes, controllers, and FormRequest validations — complete with **folder grouping** and **response examples**.
 
 ---
 
-## ✨ Features
+## Features
 
 - 🔍 **Route Scanning** — Automatically reads all registered API routes
 - 📝 **Request Analysis** — Extracts validation rules from FormRequest classes and inline `$request->validate()` calls
-- 🎯 **Smart Example Data** — Generates realistic sample values based on validation rules and field names
+- **Example Data Generation** — Generates realistic sample values based on validation rules and field names
 - 🔐 **Authentication Detection** — Automatically adds auth headers based on middleware (Sanctum, Passport, etc.)
-- 📁 **Hierarchical Grouping** — Organizes requests into nested folders based on route prefixes
-- 📋 **Response Examples** — Extracts response structures from PHPDoc, API Resources, `response()->json()`, and Eloquent models
-- 📄 **OpenAPI Support** — Export your API as a valid OpenAPI 3.0.3 specification
-- 🚀 **Postman Upload** — Optionally upload collections directly via the Postman API
+- **Folder Grouping** — Organizes requests into folders based on route prefixes
+- **Response Examples** — Extracts response structures from PHPDoc, API Resources, `response()->json()`, and Eloquent models
+- **OpenAPI Support** — Export your API as a valid OpenAPI 3.0.3 specification
+- **Postman Upload** — Optionally upload generated Postman collections directly via the Postman API
 - ⚡ **Artisan Command** — Beautiful CLI with progress indicators and colored output
 
 ---
@@ -54,7 +54,7 @@ php artisan vendor:publish --tag=postman-exporter-config
 
 ---
 
-## 🚀 Usage
+## Usage
 
 ### Artisan Command
 
@@ -147,7 +147,7 @@ Response examples are extracted automatically from your controller methods and a
 'responses' => [
     'enabled'         => true,
     'fallback_status' => 200,
-    'fallback_body'   => ['message' => 'Success'],
+    'fallback_body'   => null,
 ],
 ```
 
@@ -174,7 +174,7 @@ php artisan postman:export --with-responses
 
 4. **Eloquent Model** — Detects `return User::find(...)` patterns and generates example data from the model's `$fillable` fields.
 
-5. **Fallback** — Uses the configured `fallback_status` and `fallback_body`.
+5. **Fallback** — Uses the configured fallback status and body. By default, the body is `null` so unknown responses are not documented as fabricated success payloads.
 
 **Generated response format in Postman:**
 
@@ -222,7 +222,7 @@ php artisan postman:export --with-responses
 
 ---
 
-## 📄 Example Output
+## Example Output
 
 The generated collection follows the [Postman Collection v2.1 schema](https://schema.getpostman.com/json/collection/v2.1.0/collection.json). Folders are flat (single-level) and each request includes response examples:
 
@@ -349,7 +349,7 @@ vendor/bin/phpunit
 
 ---
 
-## 📋 Requirements
+## Requirements
 
 - PHP 8.1+
 - Laravel 10, 11, or 12

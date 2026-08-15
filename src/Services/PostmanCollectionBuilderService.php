@@ -80,15 +80,27 @@ class PostmanCollectionBuilderService implements CollectionBuilderInterface
 
         // Add body for POST/PUT/PATCH
         if (in_array($method, ['POST', 'PUT', 'PATCH'], true) && ! empty($route['body_params'])) {
-            $item['request']['body'] = [
-                'mode' => 'raw',
-                'raw' => json_encode($route['body_params'], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES),
-                'options' => [
-                    'raw' => [
-                        'language' => 'json',
+            if ($this->hasFileFields($route)) {
+                $item['request']['body'] = [
+                    'mode' => 'formdata',
+                    'formdata' => $this->buildFormData($route),
+                ];
+
+                $item['request']['header'] = array_values(array_filter(
+                    $item['request']['header'],
+                    fn (array $header) => strtolower($header['key']) !== 'content-type'
+                ));
+            } else {
+                $item['request']['body'] = [
+                    'mode' => 'raw',
+                    'raw' => json_encode($route['body_params'], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES),
+                    'options' => [
+                        'raw' => [
+                            'language' => 'json',
+                        ],
                     ],
-                ],
-            ];
+                ];
+            }
         }
 
         // Add description
@@ -101,6 +113,57 @@ class PostmanCollectionBuilderService implements CollectionBuilderInterface
         }
 
         return $item;
+    }
+
+    /**
+     * Determine whether the request contains file fields.
+     */
+    protected function hasFileFields(array $route): bool
+    {
+        foreach ($route['body_params_parsed'] ?? [] as $field) {
+            if (($field['type'] ?? null) === 'file') {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Build multipart form-data fields.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    protected function buildFormData(array $route): array
+    {
+        $formData = [];
+        $parsedFields = $route['body_params_parsed'] ?? [];
+
+        foreach ($route['body_params'] ?? [] as $key => $value) {
+            $type = ($parsedFields[$key]['type'] ?? null) === 'file'
+                ? 'file'
+                : 'text';
+
+            if ($type === 'file') {
+                $formData[] = [
+                    'key' => $key,
+                    'type' => 'file',
+                    'src' => null,
+                ];
+
+                continue;
+            }
+
+            $formData[] = [
+                'key' => $key,
+                'type' => 'text',
+                'value' => is_scalar($value)
+                    ? (string) $value
+                    : json_encode($value, JSON_UNESCAPED_SLASHES),
+            ];
+        }
+
+        return $formData;
     }
 
     /**

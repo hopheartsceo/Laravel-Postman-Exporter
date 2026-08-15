@@ -40,12 +40,17 @@ class ExportPostmanCommand extends Command
     ): int
     {
         $this->newLine();
-        $this->components->info('🚀 Laravel Postman & OpenAPI Exporter');
+        $this->components->info('Laravel Postman & OpenAPI Exporter');
         $this->newLine();
 
         $format = $this->option('format');
         if (! in_array($format, ['postman', 'openapi'])) {
             $this->error("Invalid format: {$format}. Supported: postman, openapi");
+            return self::FAILURE;
+        }
+
+        if ($format === 'openapi' && ($this->option('upload') || config('postman-exporter.enable_upload'))) {
+            $this->components->error('OpenAPI specifications cannot be uploaded with the Postman collection uploader.');
             return self::FAILURE;
         }
 
@@ -82,7 +87,7 @@ class ExportPostmanCommand extends Command
 
         // Show response status
         if (config('postman-exporter.responses.enabled')) {
-            $this->components->info('  📋 Response examples included');
+            $this->components->info('Response examples included.');
         }
 
         $this->newLine();
@@ -96,9 +101,14 @@ class ExportPostmanCommand extends Command
             }
         }
 
-        $this->components->task('Saving collection', function () use ($manager, $outputPath) {
+        $saved = false;
+        $saveLabel = $format === 'openapi' ? 'Saving specification' : 'Saving collection';
+
+        $this->components->task($saveLabel, function () use ($manager, $outputPath, &$saved) {
             try {
                 $manager->save($outputPath);
+                $saved = true;
+
                 return true;
             } catch (\Throwable $e) {
                 $this->error('  Error: ' . $e->getMessage());
@@ -106,19 +116,28 @@ class ExportPostmanCommand extends Command
             }
         });
 
+        if (! $saved) {
+            $this->components->error('Failed to save specification.');
+            return self::FAILURE;
+        }
+
         $this->newLine();
-        $this->components->info("  📄 Saved to: {$outputPath}");
+        $this->components->info("Saved to: {$outputPath}");
 
         // Step 4: Upload (optional)
         if ($this->option('upload') || config('postman-exporter.enable_upload')) {
             $apiKey = $this->option('api-key') ?? config('postman-exporter.postman_api_key');
 
             $this->newLine();
-            $this->components->task('Uploading to Postman', function () use ($uploader, $collection, $apiKey) {
+            $uploaded = false;
+
+            $this->components->task('Uploading to Postman', function () use ($uploader, $collection, $apiKey, &$uploaded) {
                 try {
                     $result = $uploader->upload($collection, $apiKey);
 
                     if ($result['success']) {
+                        $uploaded = true;
+
                         return true;
                     }
 
@@ -129,10 +148,15 @@ class ExportPostmanCommand extends Command
                     return false;
                 }
             });
+
+            if (! $uploaded) {
+                $this->components->error('Failed to upload collection to Postman.');
+                return self::FAILURE;
+            }
         }
 
         $this->newLine();
-        $this->components->info('✅ Postman collection generated successfully!');
+        $this->components->info($format === 'openapi' ? 'OpenAPI specification generated successfully.' : 'Postman collection generated successfully.');
         $this->newLine();
 
         return self::SUCCESS;

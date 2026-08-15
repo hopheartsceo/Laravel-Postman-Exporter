@@ -88,6 +88,21 @@ class ResponseExtractorTest extends TestCase
         $this->assertEquals('fallback', $responses[0]['source']);
     }
 
+
+    public function test_fallback_does_not_invent_success_body(): void
+    {
+        $responses = $this->extractor->extract([
+            'controller' => TestPlainController::class,
+            'controller_method' => 'index',
+        ]);
+
+        $response = $responses[0];
+
+        $this->assertEquals('fallback', $response['source']);
+        $this->assertNull($response['body']);
+        $this->assertEquals('Fallback Response', $response['name']);
+    }
+
     public function test_fallback_response_has_correct_structure(): void
     {
         $routeData = [
@@ -103,6 +118,45 @@ class ResponseExtractorTest extends TestCase
         $this->assertArrayHasKey('status_text', $response);
         $this->assertArrayHasKey('body', $response);
         $this->assertArrayHasKey('name', $response);
+    }
+
+
+
+    public function test_extracts_empty_json_array_response(): void
+    {
+        $responses = $this->extractor->extract([
+            'controller' => TestEmptyJsonResponseController::class,
+            'controller_method' => 'index',
+        ]);
+
+        $this->assertEquals('json_response', $responses[0]['source']);
+        $this->assertEquals(200, $responses[0]['status_code']);
+        $this->assertSame([], $responses[0]['body']);
+    }
+
+
+    public function test_extracts_no_content_response(): void
+    {
+        $responses = $this->extractor->extract([
+            'controller' => TestLaravelNoContentController::class,
+            'controller_method' => 'destroy',
+        ]);
+
+        $this->assertEquals('json_response', $responses[0]['source']);
+        $this->assertEquals(204, $responses[0]['status_code']);
+        $this->assertNull($responses[0]['body']);
+    }
+
+    public function test_extracts_null_json_response_with_204_status(): void
+    {
+        $responses = $this->extractor->extract([
+            'controller' => TestNoContentController::class,
+            'controller_method' => 'destroy',
+        ]);
+
+        $this->assertEquals('json_response', $responses[0]['source']);
+        $this->assertEquals(204, $responses[0]['status_code']);
+        $this->assertNull($responses[0]['body']);
     }
 
     public function test_phpdoc_with_status_code(): void
@@ -181,5 +235,32 @@ class TestPlainController
     public function index()
     {
         return 'hello';
+    }
+}
+
+
+class TestNoContentController
+{
+    public function destroy()
+    {
+        return response()->json(null, 204);
+    }
+}
+
+
+class TestEmptyJsonResponseController
+{
+    public function index()
+    {
+        return response()->json([]);
+    }
+}
+
+
+class TestLaravelNoContentController
+{
+    public function destroy()
+    {
+        return response()->noContent();
     }
 }

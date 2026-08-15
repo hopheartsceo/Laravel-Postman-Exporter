@@ -181,4 +181,41 @@ class ValidationParserTest extends TestCase
         $this->assertEquals('string', $schema['properties']['settings']['properties']['theme']['type']);
         $this->assertEquals(['light', 'dark'], $schema['properties']['settings']['properties']['theme']['enum']);
     }
+
+    public function test_wildcard_example_replaces_generic_array_items(): void
+    {
+        $parsed = $this->parser->parse([
+            'roles' => ['required', 'array', 'min:1'],
+            'roles.*' => ['required', 'string', 'in:admin,editor,user'],
+        ]);
+
+        $body = $this->parser->buildExampleBody($parsed);
+
+        $this->assertSame(['admin'], $body['roles']);
+    }
+
+
+
+    public function test_json_schema_uses_array_wildcard_items(): void
+    {
+        $parsed = $this->parser->parse([
+            'roles' => ['required', 'array', 'min:1'],
+            'roles.*' => ['required', 'string', 'in:admin,editor,user'],
+        ]);
+
+        $schema = $this->parser->toJsonSchema($parsed);
+        $roles = $schema['properties']['roles'];
+
+        $this->assertEquals('array', $roles['type']);
+        $this->assertEquals(1, $roles['minItems']);
+        $this->assertArrayNotHasKey('minimum', $roles);
+        $this->assertArrayNotHasKey('roles.*', $schema['properties']);
+        $this->assertEquals('string', $roles['items']['type']);
+        $this->assertEquals(
+            ['admin', 'editor', 'user'],
+            $roles['items']['enum']
+        );
+    }
+
+
 }

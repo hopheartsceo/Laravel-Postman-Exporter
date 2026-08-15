@@ -26,8 +26,32 @@ class ExampleResponseGeneratorService implements ExampleResponseGeneratorInterfa
     {
         $statusCode = $responseData['status_code'] ?? 200;
         $statusText = $responseData['status_text'] ?? 'OK';
-        $body = $responseData['body'] ?? ['message' => 'Success'];
+        $body = array_key_exists('body', $responseData)
+            ? $responseData['body']
+            : null;
         $name = $responseData['name'] ?? 'Success Response';
+
+        if ($statusCode === 204) {
+            return [
+                'name' => $name,
+                'originalRequest' => $originalRequest,
+                'status' => $statusText,
+                'code' => $statusCode,
+                'header' => [],
+                'body' => '',
+            ];
+        }
+
+        if (($responseData['source'] ?? null) === 'fallback' && $body === null) {
+            return [
+                'name' => $name,
+                'originalRequest' => $originalRequest,
+                'status' => $statusText,
+                'code' => $statusCode,
+                'header' => [],
+                'body' => '',
+            ];
+        }
 
         return [
             'name' => $name,
@@ -54,7 +78,7 @@ class ExampleResponseGeneratorService implements ExampleResponseGeneratorInterfa
     public function generateFallback(array $originalRequest): array
     {
         $fallbackStatus = (int) ($this->config['responses']['fallback_status'] ?? 200);
-        $fallbackBody = $this->config['responses']['fallback_body'] ?? ['message' => 'Success'];
+        $fallbackBody = $this->config['responses']['fallback_body'] ?? null;
 
         return $this->generate(
             [
@@ -62,7 +86,7 @@ class ExampleResponseGeneratorService implements ExampleResponseGeneratorInterfa
                 'status_code' => $fallbackStatus,
                 'status_text' => $this->getStatusText($fallbackStatus),
                 'body' => $fallbackBody,
-                'name' => 'Success Response',
+                'name' => 'Fallback Response',
             ],
             $originalRequest
         );

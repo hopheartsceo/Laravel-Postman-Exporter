@@ -8,3 +8,5 @@
 /coverage/
 /laravel-test-app/
 postman_collection.json
+.phpunit.cache/
+/tmp/*.json

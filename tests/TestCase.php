@@ -74,9 +74,7 @@ abstract class TestCase extends OrchestraTestCase
         $app['config']->set('postman-exporter.responses', [
             'enabled' => true,
             'fallback_status' => 200,
-            'fallback_body' => [
-                'message' => 'Success',
-            ],
+            'fallback_body' => null,
         ]);
     }
 }

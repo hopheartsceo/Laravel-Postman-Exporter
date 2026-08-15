@@ -276,6 +276,48 @@ class PostmanCollectionBuilderTest extends TestCase
         $this->assertContains('per_page', $queryKeys);
     }
 
+
+    public function test_file_fields_use_multipart_form_data(): void
+    {
+        $item = $this->builder->buildRequestItem([
+            'method' => 'POST',
+            'uri' => 'api/profile',
+            'name' => 'profile.update',
+            'middleware' => [],
+            'body_params' => [
+                'name' => 'Ahmed',
+                'avatar' => '(binary)',
+            ],
+            'body_params_parsed' => [
+                'name' => [
+                    'type' => 'string',
+                ],
+                'avatar' => [
+                    'type' => 'file',
+                ],
+            ],
+        ]);
+
+        $body = $item['request']['body'];
+
+        $this->assertSame('formdata', $body['mode']);
+
+        $formData = collect($body['formdata'])->keyBy('key');
+
+        $this->assertSame('text', $formData['name']['type']);
+        $this->assertSame('Ahmed', $formData['name']['value']);
+
+        $this->assertSame('file', $formData['avatar']['type']);
+        $this->assertNull($formData['avatar']['src']);
+
+        $headerKeys = array_map(
+            fn (array $header) => strtolower($header['key']),
+            $item['request']['header']
+        );
+
+        $this->assertNotContains('content-type', $headerKeys);
+    }
+
     public function test_response_examples_included_when_enabled(): void
     {
         // Enable responses in config
@@ -296,8 +338,10 @@ class PostmanCollectionBuilderTest extends TestCase
         $this->assertArrayHasKey('status', $response);
         $this->assertArrayHasKey('code', $response);
         $this->assertArrayHasKey('body', $response);
-        $this->assertArrayHasKey('_postman_previewlanguage', $response);
-        $this->assertEquals('json', $response['_postman_previewlanguage']);
+        $this->assertEquals('Fallback Response', $response['name']);
+        $this->assertSame('', $response['body']);
+        $this->assertSame([], $response['header']);
+        $this->assertArrayNotHasKey('_postman_previewlanguage', $response);
     }
 
     public function test_response_examples_empty_when_disabled(): void

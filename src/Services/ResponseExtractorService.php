@@ -100,7 +100,7 @@ class ResponseExtractorService implements ResponseExtractorInterface
                     'status_code' => $statusCode,
                     'status_text' => $this->getStatusText($statusCode),
                     'body' => $decoded,
-                    'name' => 'Success Response',
+                    'name' => 'Fallback Response',
                 ];
             }
         }
@@ -192,13 +192,39 @@ class ResponseExtractorService implements ResponseExtractorInterface
             return null;
         }
 
+        // Match Laravel no-content responses.
+        if (preg_match('/return\s+response\(\)\s*->\s*noContent\s*\(\s*(?:(\d{3}))?[^)]*\)/s', $source, $matches)) {
+            $statusCode = ! empty($matches[1]) ? (int) $matches[1] : 204;
+
+            return [
+                'source' => 'json_response',
+                'status_code' => $statusCode,
+                'status_text' => $this->getStatusText($statusCode),
+                'body' => null,
+                'name' => 'Response',
+            ];
+        }
+
+        // Match JSON responses with an explicit null body, such as a 204 No Content response.
+        if (preg_match('/return\s+(?:response\(\)\s*->\s*json|Response::json)\s*\(\s*null\s*(?:,\s*(\d{3}))?\s*\)/s', $source, $matches)) {
+            $statusCode = isset($matches[1]) ? (int) $matches[1] : 200;
+
+            return [
+                'source' => 'json_response',
+                'status_code' => $statusCode,
+                'status_text' => $this->getStatusText($statusCode),
+                'body' => null,
+                'name' => 'Response',
+            ];
+        }
+
         // Match: return response()->json([...]) or return response()->json([...], 201)
         if (preg_match('/return\s+response\(\)\s*->\s*json\s*\(\s*(\[[\s\S]*?\])\s*(?:,\s*(\d{3}))?\s*\)/s', $source, $matches)) {
             $arrayStr = $matches[1];
             $statusCode = isset($matches[2]) ? (int) $matches[2] : 200;
 
             $decoded = $this->safeEvalArray($arrayStr);
-            if (! empty($decoded)) {
+            if ($decoded !== null) {
                 return [
                     'source' => 'json_response',
                     'status_code' => $statusCode,
@@ -215,7 +241,7 @@ class ResponseExtractorService implements ResponseExtractorInterface
             $statusCode = isset($matches[2]) ? (int) $matches[2] : 200;
 
             $decoded = $this->safeEvalArray($arrayStr);
-            if (! empty($decoded)) {
+            if ($decoded !== null) {
                 return [
                     'source' => 'json_response',
                     'status_code' => $statusCode,
@@ -290,14 +316,14 @@ class ResponseExtractorService implements ResponseExtractorInterface
     protected function buildFallbackResponse(): array
     {
         $fallbackStatus = (int) config('postman-exporter.responses.fallback_status', 200);
-        $fallbackBody = config('postman-exporter.responses.fallback_body', ['message' => 'Success']);
+        $fallbackBody = config('postman-exporter.responses.fallback_body');
 
         return [
             'source' => 'fallback',
             'status_code' => $fallbackStatus,
             'status_text' => $this->getStatusText($fallbackStatus),
             'body' => $fallbackBody,
-            'name' => 'Success Response',
+            'name' => 'Fallback Response',
         ];
     }
 
@@ -538,7 +564,7 @@ class ResponseExtractorService implements ResponseExtractorInterface
      *
      * @return array<string, mixed>
      */
-    protected function safeEvalArray(string $arrayStr): array
+    protected function safeEvalArray(string $arrayStr): ?array
     {
         // Replace $variables and method calls with placeholder strings
         $cleaned = preg_replace('/\$[\w\->()]+/', "'example'", $arrayStr);
@@ -546,14 +572,14 @@ class ResponseExtractorService implements ResponseExtractorInterface
 
         // Only allow simple literal values
         if (preg_match('/[\\\\]/', str_replace(['\'', '"', ',', '|', ' ', "\n", "\r", "\t", '[', ']', '=>', ':', '.', '_', '*'], '', $cleaned))) {
-            return [];
+            return null;
         }
 
         try {
             $result = eval('return ' . $cleaned . ';');
-            return is_array($result) ? $result : [];
+            return is_array($result) ? $result : null;
         } catch (\Throwable) {
-            return [];
+            return null;
         }
     }
 

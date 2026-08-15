@@ -68,6 +68,40 @@ class ExampleResponseGeneratorTest extends TestCase
         $this->assertEquals('success', $decoded['status']);
     }
 
+
+    public function test_generates_no_content_response_without_body_or_json_headers(): void
+    {
+        $result = $this->generator->generate([
+            'source' => 'json_response',
+            'status_code' => 204,
+            'status_text' => 'No Content',
+            'body' => null,
+            'name' => 'Response',
+        ], []);
+
+        $this->assertEquals(204, $result['code']);
+        $this->assertSame('', $result['body']);
+        $this->assertSame([], $result['header']);
+        $this->assertArrayNotHasKey('_postman_previewlanguage', $result);
+    }
+
+
+    public function test_fallback_with_unknown_body_does_not_invent_success_response(): void
+    {
+        $result = $this->generator->generate([
+            'source' => 'fallback',
+            'status_code' => 200,
+            'status_text' => 'OK',
+            'body' => null,
+            'name' => 'Fallback Response',
+        ], []);
+
+        $this->assertEquals('Fallback Response', $result['name']);
+        $this->assertSame('', $result['body']);
+        $this->assertSame([], $result['header']);
+        $this->assertArrayNotHasKey('_postman_previewlanguage', $result);
+    }
+
     public function test_generates_fallback_response(): void
     {
         $originalRequest = [
@@ -77,12 +111,11 @@ class ExampleResponseGeneratorTest extends TestCase
 
         $result = $this->generator->generateFallback($originalRequest);
 
-        $this->assertEquals('Success Response', $result['name']);
+        $this->assertEquals('Fallback Response', $result['name']);
         $this->assertEquals(200, $result['code']);
-        $this->assertNotEmpty($result['body']);
-
-        $decoded = json_decode($result['body'], true);
-        $this->assertEquals('Success', $decoded['message']);
+        $this->assertSame('', $result['body']);
+        $this->assertSame([], $result['header']);
+        $this->assertArrayNotHasKey('_postman_previewlanguage', $result);
     }
 
     public function test_generates_all_responses(): void

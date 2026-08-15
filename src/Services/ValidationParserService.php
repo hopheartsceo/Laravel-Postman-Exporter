@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Hopheartsceo\PostmanExporter\Services;
 
 use Hopheartsceo\PostmanExporter\Contracts\ValidationParserInterface;
+use Hopheartsceo\PostmanExporter\Mappers\ValidationToJsonSchemaMapper;
 
 /**
  * Parses Laravel validation rules into structured format.
@@ -13,6 +14,7 @@ class ValidationParserService implements ValidationParserInterface
 {
     public function __construct(
         protected ExampleDataGeneratorService $exampleGenerator,
+        protected ?ValidationToJsonSchemaMapper $schemaMapper = null,
     ) {}
 
     /**
@@ -183,16 +185,22 @@ class ValidationParserService implements ValidationParserInterface
         $current = &$array;
         foreach ($keys as $i => $segment) {
             if ($segment === '*') {
-                // Create an array with one example item
-                if (! isset($current[0]) || ! is_array($current[0])) {
-                    $current[0] = [];
-                }
                 $remaining = array_slice($keys, $i + 1);
-                if (count($remaining) > 0) {
-                    $this->setNestedValue($current[0], implode('.', $remaining), $value);
-                } else {
-                    $current[0] = $value;
+
+                if (count($remaining) === 0) {
+                    // Replace generic array examples with one valid wildcard example.
+                    $current = [$value];
+                    return;
                 }
+
+                // Preserve an item already built by sibling wildcard fields,
+                // otherwise replace generic parent examples with one object item.
+                if (count($current) !== 1 || ! isset($current[0]) || ! is_array($current[0])) {
+                    $current = [[]];
+                }
+
+                $this->setNestedValue($current[0], implode('.', $remaining), $value);
+
                 return;
             }
 
@@ -215,121 +223,8 @@ class ValidationParserService implements ValidationParserInterface
      */
     public function toJsonSchema(array $parsedFields): array
     {
-        $properties = [];
-        $required = [];
+        $mapper = $this->schemaMapper ?? new ValidationToJsonSchemaMapper();
 
-        $jsonTypeMap = [
-            'string' => 'string',
-            'integer' => 'integer',
-            'number' => 'number',
-            'boolean' => 'boolean',
-            'array' => 'array',
-            'file' => 'string',
-        ];
-
-        foreach ($parsedFields as $field => $info) {
-            $jsonType = $jsonTypeMap[$info['type']] ?? 'string';
-
-            $property = [
-                'type' => $jsonType,
-                'example' => $info['example'],
-            ];
-
-            // Extract constraints from rules
-            foreach ($info['rules'] as $rule) {
-                if (! is_string($rule)) {
-                    continue;
-                }
-
-                if (str_starts_with($rule, 'max:')) {
-                    $max = (int) substr($rule, 4);
-                    if ($jsonType === 'string') {
-                        $property['maxLength'] = $max;
-                    } else {
-                        $property['maximum'] = $max;
-                    }
-                }
-
-                if (str_starts_with($rule, 'min:')) {
-                    $min = (int) substr($rule, 4);
-                    if ($jsonType === 'string') {
-                        $property['minLength'] = $min;
-                    } else {
-                        $property['minimum'] = $min;
-                    }
-                }
-
-                if (str_starts_with($rule, 'in:')) {
-                    $property['enum'] = explode(',', substr($rule, 3));
-                }
-
-                if ($rule === 'email') {
-                    $property['format'] = 'email';
-                }
-
-                if ($rule === 'url') {
-                    $property['format'] = 'uri';
-                }
-
-                if ($rule === 'uuid') {
-                    $property['format'] = 'uuid';
-                }
-
-                if ($rule === 'date') {
-                    $property['format'] = 'date';
-                }
-
-                if ($rule === 'ip' || $rule === 'ipv4') {
-                    $property['format'] = 'ipv4';
-                }
-
-                if ($rule === 'ipv6') {
-                    $property['format'] = 'ipv6';
-                }
-
-                if ($rule === 'nullable') {
-                    $property['nullable'] = true;
-                }
-            }
-
-            // Handle dot-notation fields — nest under properties
-            if (str_contains($field, '.') && ! str_contains($field, '*')) {
-                $segments = explode('.', $field);
-                $current = &$properties;
-                foreach ($segments as $i => $segment) {
-                    if ($i === count($segments) - 1) {
-                        $current[$segment] = $property;
-                    } else {
-                        if (! isset($current[$segment])) {
-                            $current[$segment] = [
-                                'type' => 'object',
-                                'properties' => [],
-                            ];
-                        }
-                        $current = &$current[$segment]['properties'];
-                    }
-                }
-            } else {
-                $properties[$field] = $property;
-            }
-
-            if ($info['required']) {
-                $topLevelField = explode('.', $field)[0];
-                if (! in_array($topLevelField, $required, true)) {
-                    $required[] = $topLevelField;
-                }
-            }
-        }
-
-        $schema = [
-            'type' => 'object',
-            'properties' => $properties,
-        ];
-
-        if (! empty($required)) {
-            $schema['required'] = $required;
-        }
-
-        return $schema;
+        return $mapper->map($parsedFields);
     }
 }

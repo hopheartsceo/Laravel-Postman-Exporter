@@ -48,8 +48,18 @@ class RouteScannerService implements RouteScannerInterface
 
         foreach ($routes as $route) {
             /** @var Route $route */
-            if ($this->shouldInclude($route)) {
-                $scannedRoutes[] = $this->extractRouteData($route);
+            if (! $this->shouldInclude($route)) {
+                continue;
+            }
+
+            $routeData = $this->extractRouteData($route);
+            $methods = $routeData['methods'] ?? [$routeData['method'] ?? 'GET'];
+
+            foreach ($methods as $method) {
+                $methodRoute = $routeData;
+                $methodRoute['method'] = $method;
+
+                $scannedRoutes[] = $methodRoute;
             }
         }
 
@@ -80,7 +90,7 @@ class RouteScannerService implements RouteScannerInterface
         $prefix = $this->extractPrefix($uri);
         $middleware = $this->getMiddleware($route);
         $parameters = $route->parameterNames();
-        $isApi = str_starts_with($uri, 'api') || in_array('api', $middleware, true);
+        $isApi = $this->isApiRoute($uri, $middleware);
 
         // Extract controller method metadata for response building
         $returnType = null;
@@ -197,7 +207,7 @@ class RouteScannerService implements RouteScannerInterface
         }
 
         // Check include/exclude web routes
-        $isApi = str_starts_with($uri, 'api') || in_array('api', $middleware, true);
+        $isApi = $this->isApiRoute($uri, $middleware);
         if (! $isApi && ! ($this->config['include_web_routes'] ?? false)) {
             return false;
         }
@@ -251,6 +261,18 @@ class RouteScannerService implements RouteScannerInterface
         }
 
         return true;
+    }
+
+    /**
+     * Determine whether a route belongs to the API.
+     *
+     * @param  array<int, string>  $middleware
+     */
+    protected function isApiRoute(string $uri, array $middleware): bool
+    {
+        return $uri === 'api'
+            || str_starts_with($uri, 'api/')
+            || in_array('api', $middleware, true);
     }
 
     /**

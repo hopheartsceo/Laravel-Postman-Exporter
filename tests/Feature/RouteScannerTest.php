@@ -21,6 +21,8 @@ class RouteScannerTest extends TestCase
 
             $router->get('posts', [TestDummyController::class, 'index'])->name('posts.index');
             $router->post('posts', [TestDummyController::class, 'store'])->name('posts.store');
+            $router->match(['GET', 'POST'], 'multi-method', [TestDummyController::class, 'index'])
+                ->name('multi-method');
         });
     }
 
@@ -43,6 +45,24 @@ class RouteScannerTest extends TestCase
         $this->assertContains('POST', $methods);
         $this->assertContains('PUT', $methods);
         $this->assertContains('DELETE', $methods);
+    }
+
+
+    public function test_expands_multi_method_routes(): void
+    {
+        $scanner = $this->app->make(RouteScannerService::class);
+        $routes = $scanner->scan();
+
+        $multiMethodRoutes = array_values(array_filter(
+            $routes,
+            fn (array $route) => $route['uri'] === 'api/multi-method'
+        ));
+
+        $this->assertCount(2, $multiMethodRoutes);
+        $this->assertEquals(
+            ['GET', 'POST'],
+            array_column($multiMethodRoutes, 'method')
+        );
     }
 
     public function test_extracts_uris(): void
@@ -109,6 +129,19 @@ class RouteScannerTest extends TestCase
 
         $uris = array_column($routes, 'uri');
         $this->assertNotContains('api/closure-test', $uris);
+    }
+
+
+    public function test_does_not_treat_apiary_prefix_as_api_route(): void
+    {
+        Route::get('apiary/status', [TestDummyController::class, 'index']);
+
+        $scanner = $this->app->make(RouteScannerService::class);
+        $routes = $scanner->scan();
+
+        $uris = array_column($routes, 'uri');
+
+        $this->assertNotContains('apiary/status', $uris);
     }
 
     public function test_excludes_web_routes_by_default(): void
