@@ -29,7 +29,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
@@ -45,7 +45,7 @@ jobs:
         run: composer require --dev --no-update "orchestra/testbench:^${{ matrix.testbench }}.0"
 
       - name: Install dependencies
-        run: composer update --prefer-dist --no-interaction --no-progress
+        run: composer update --prefer-dist --no-interaction --no-progress --no-blocking
 
       - name: Run tests
         run: composer test
