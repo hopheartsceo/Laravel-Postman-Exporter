@@ -4,13 +4,16 @@ declare(strict_types=1);
 
 namespace Hopheartsceo\PostmanExporter;
 
+use Hopheartsceo\PostmanExporter\Commands\CheckApiContractCommand;
 use Hopheartsceo\PostmanExporter\Commands\ExportPostmanCommand;
 use Hopheartsceo\PostmanExporter\Builders\OpenApiDocumentBuilder;
 use Hopheartsceo\PostmanExporter\Builders\OpenApiPathBuilder;
 use Hopheartsceo\PostmanExporter\Mappers\ValidationToJsonSchemaMapper;
+use Hopheartsceo\PostmanExporter\Services\ContractDiffService;
 use Hopheartsceo\PostmanExporter\Services\ExampleDataGeneratorService;
 use Hopheartsceo\PostmanExporter\Services\ExampleResponseGeneratorService;
 use Hopheartsceo\PostmanExporter\Services\FolderOrganizerService;
+use Hopheartsceo\PostmanExporter\Services\FormRequestRulesResolverService;
 use Hopheartsceo\PostmanExporter\Services\OpenApiExporterService;
 use Hopheartsceo\PostmanExporter\Services\PostmanCollectionBuilderService;
 use Hopheartsceo\PostmanExporter\Services\PostmanUploaderService;
@@ -53,11 +56,23 @@ class PostmanExporterServiceProvider extends ServiceProvider
             );
         });
 
+        $this->app->singleton(FormRequestRulesResolverService::class, function ($app) {
+            return new FormRequestRulesResolverService(
+                $app,
+                $app->make(ExampleDataGeneratorService::class),
+            );
+        });
+
         $this->app->singleton(RequestAnalyzerService::class, function ($app) {
             return new RequestAnalyzerService(
                 $app->make(ValidationParserService::class),
-                $app->make(ExampleDataGeneratorService::class)
+                $app->make(ExampleDataGeneratorService::class),
+                $app->make(FormRequestRulesResolverService::class),
             );
+        });
+
+        $this->app->singleton(ContractDiffService::class, function () {
+            return new ContractDiffService();
         });
 
         $this->app->singleton(FolderOrganizerService::class, function ($app) {
@@ -147,6 +162,7 @@ class PostmanExporterServiceProvider extends ServiceProvider
 
             $this->commands([
                 ExportPostmanCommand::class,
+                CheckApiContractCommand::class,
             ]);
         }
     }

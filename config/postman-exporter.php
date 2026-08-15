@@ -165,6 +165,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | API Contract Guard
+    |--------------------------------------------------------------------------
+    |
+    | Baseline OpenAPI document used by `php artisan postman:check`.
+    | Commit this file or provide another path with --against.
+    |
+    */
+    'contract' => [
+        'baseline_path' => base_path('openapi-baseline.json'),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Include Web Routes
     |--------------------------------------------------------------------------
     |

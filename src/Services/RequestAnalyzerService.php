@@ -6,7 +6,6 @@ namespace Hopheartsceo\PostmanExporter\Services;
 
 use Hopheartsceo\PostmanExporter\Contracts\RequestAnalyzerInterface;
 use Illuminate\Foundation\Http\FormRequest;
-use ReflectionClass;
 use ReflectionMethod;
 use ReflectionNamedType;
 
@@ -20,6 +19,7 @@ class RequestAnalyzerService implements RequestAnalyzerInterface
     public function __construct(
         protected ValidationParserService $validationParser,
         protected ExampleDataGeneratorService $exampleGenerator,
+        protected ?FormRequestRulesResolverService $formRequestResolver = null,
     ) {}
 
     /**
@@ -102,7 +102,7 @@ class RequestAnalyzerService implements RequestAnalyzerInterface
         }
 
         // Check for FormRequest type-hinted parameters
-        $rules = $this->extractFormRequestRules($reflection);
+        $rules = $this->extractFormRequestRules($reflection, $routeData);
 
         // Fallback: check for inline validation in source code
         if (empty($rules)) {
@@ -134,9 +134,10 @@ class RequestAnalyzerService implements RequestAnalyzerInterface
     /**
      * Extract validation rules from a FormRequest type-hint.
      *
+     * @param  array<string, mixed>  $routeData
      * @return array<string, mixed>
      */
-    protected function extractFormRequestRules(ReflectionMethod $method): array
+    protected function extractFormRequestRules(ReflectionMethod $method, array $routeData): array
     {
         foreach ($method->getParameters() as $param) {
             $type = $param->getType();
@@ -147,24 +148,14 @@ class RequestAnalyzerService implements RequestAnalyzerInterface
 
             $className = $type->getName();
 
-            if (! class_exists($className)) {
+            if (! class_exists($className) || ! is_subclass_of($className, FormRequest::class)) {
                 continue;
             }
 
             try {
-                $classReflection = new ReflectionClass($className);
+                $resolver = $this->formRequestResolver ?? app(FormRequestRulesResolverService::class);
 
-                if ($classReflection->isSubclassOf(FormRequest::class)) {
-                    // Instantiate the FormRequest without constructor validation
-                    $instance = $classReflection->newInstanceWithoutConstructor();
-
-                    if (method_exists($instance, 'rules')) {
-                        $rulesMethod = new ReflectionMethod($instance, 'rules');
-                        $rulesMethod->setAccessible(true);
-
-                        return $rulesMethod->invoke($instance);
-                    }
-                }
+                return $resolver->resolve($className, $routeData);
             } catch (\Throwable) {
                 continue;
             }

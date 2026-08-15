@@ -10,19 +10,21 @@ Automatically generate **Postman Collection v2.1** files and **OpenAPI 3.0** spe
 
 ## Features
 
-- 🔍 **Route Scanning** — Automatically reads all registered API routes
-- 📝 **Request Analysis** — Extracts validation rules from FormRequest classes and inline `$request->validate()` calls
+- **Route Scanning** — Automatically reads all registered API routes
+- **Request Analysis** — Extracts validation rules from FormRequest classes and inline `$request->validate()` calls
+- **Context-Aware FormRequests** — Evaluates rules with the actual HTTP method, route name, route parameters, and container-injected dependencies
+- **API Contract Guard** — Detects breaking request and response changes and returns a failing exit code for CI
 - **Example Data Generation** — Generates realistic sample values based on validation rules and field names
-- 🔐 **Authentication Detection** — Automatically adds auth headers based on middleware (Sanctum, Passport, etc.)
+- **Authentication Detection** — Automatically adds auth headers based on middleware (Sanctum, Passport, etc.)
 - **Folder Grouping** — Organizes requests into folders based on route prefixes
 - **Response Examples** — Extracts response structures from PHPDoc, API Resources, `response()->json()`, and Eloquent models
 - **OpenAPI Support** — Export your API as a valid OpenAPI 3.0.3 specification
 - **Postman Upload** — Optionally upload generated Postman collections directly via the Postman API
-- ⚡ **Artisan Command** — Beautiful CLI with progress indicators and colored output
+- **Artisan Command** — Beautiful CLI with progress indicators and colored output
 
 ---
 
-## 📦 Installation
+## Installation
 
 You can install the package via composer:
 
@@ -73,6 +75,15 @@ php artisan postman:export --group-by-prefix
 
 # Include response examples (Postman only currently)
 php artisan postman:export --with-responses
+
+# Save the current API contract as a baseline
+php artisan postman:check --write-baseline
+
+# Fail when breaking API changes are detected
+php artisan postman:check
+
+# Compare against a custom OpenAPI baseline
+php artisan postman:check --against=docs/openapi-baseline.json
 ```
 
 ### Facade API
@@ -95,7 +106,7 @@ $result = PostmanExporter::upload('your-api-key');
 
 ---
 
-## ⚙️ Configuration
+## Configuration
 
 After publishing, edit `config/postman-exporter.php`:
 
@@ -356,6 +367,6 @@ vendor/bin/phpunit
 
 ---
 
-## 📝 License
+## License
 
 MIT License. See [LICENSE](LICENSE) for details.
