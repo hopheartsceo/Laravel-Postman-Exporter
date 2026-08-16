@@ -152,11 +152,11 @@ return [
     | Response sources are combined by distinct HTTP status code:
     | - PHPDoc @response annotations
     | - API Resource classes
-    | - response()->json() calls
+    | - response()->json() and response()->noContent() calls
     | - Custom response helper pipelines
     | - Eloquent model returns
     | - Laravel default validation errors
-    | - Fallback response when no success response can be inferred
+    | - Fallback response when no response can be inferred
     |
     */
     'responses' => [

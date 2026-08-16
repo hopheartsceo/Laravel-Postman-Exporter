@@ -40,6 +40,42 @@ class MultiResponseContractTest extends TestCase
         $this->assertSame([200, 404], $statuses);
     }
 
+    public function test_keeps_no_content_and_error_branches_together(): void
+    {
+        $responses = $this->app->make(ResponseExtractorService::class)->extract([
+            'controller' => NoContentBranchController::class,
+            'controller_method' => 'destroy',
+        ]);
+
+        $statuses = $this->statuses($responses);
+        sort($statuses);
+
+        $this->assertSame([204, 404], $statuses);
+
+        $noContent = $this->responseByStatus($responses, 204);
+
+        $this->assertSame('json_response', $noContent['source']);
+        $this->assertNull($noContent['body']);
+    }
+
+    public function test_traces_no_content_through_response_helper_pipeline(): void
+    {
+        $responses = $this->app->make(ResponseExtractorService::class)->extract([
+            'controller' => NoContentHelperController::class,
+            'controller_method' => 'destroy',
+        ]);
+
+        $statuses = $this->statuses($responses);
+        sort($statuses);
+
+        $this->assertSame([204, 404], $statuses);
+
+        $noContent = $this->responseByStatus($responses, 204);
+
+        $this->assertSame('response_pipeline', $noContent['source']);
+        $this->assertNull($noContent['body']);
+    }
+
     public function test_preserves_assignment_state_at_each_response_branch(): void
     {
         $responses = $this->app->make(ResponseExtractorService::class)->extract([
@@ -212,6 +248,44 @@ class MultiBranchController
                 'id' => 1,
             ],
         ], 200);
+    }
+}
+
+class NoContentBranchController
+{
+    public function destroy(bool $deleted = true)
+    {
+        if ($deleted) {
+            return response()->noContent();
+        }
+
+        return response()->json([
+            'message' => 'User not found',
+        ], 404);
+    }
+}
+
+trait NoContentResponseHelpers
+{
+    protected function deletedResponse()
+    {
+        return response()->noContent();
+    }
+}
+
+class NoContentHelperController
+{
+    use NoContentResponseHelpers;
+
+    public function destroy(bool $deleted = true)
+    {
+        if ($deleted) {
+            return $this->deletedResponse();
+        }
+
+        return response()->json([
+            'message' => 'User not found',
+        ], 404);
     }
 }
 

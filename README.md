@@ -186,9 +186,9 @@ The exporter combines distinct HTTP status codes from multiple sources instead o
 
 2. **API Resource** — Detects direct Resource returns and builds response schemas from the Resource's `toArray()` structure.
 
-3. **`response()->json()`** — Parses inline `response()->json([...], 200)` calls to extract the body and status code.
+3. **Direct Laravel responses** — Parses inline `response()->json([...], 200)` and `response()->noContent()` returns, including their status codes.
 
-4. **Response Pipeline Tracing** — Follows custom `$this->helper(...)`, inherited/trait helpers, and static response helper methods until it reaches `response()->json(...)`.
+4. **Response Pipeline Tracing** — Follows custom `$this->helper(...)`, inherited/trait helpers, and static response helper methods until it reaches `response()->json(...)` or `response()->noContent()`.
 
 5. **Eloquent Model** — Detects `return User::find(...)` patterns and generates example data from the model's `$fillable` fields.
 

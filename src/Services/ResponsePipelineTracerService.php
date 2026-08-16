@@ -462,28 +462,87 @@ class ResponsePipelineTracerService
         array $bindings,
     ): ?array {
         if ($expression instanceof MethodCall
-            && $this->identifierName($expression->name) === 'json'
             && $this->isResponseFactory($expression->var)) {
-            return $this->buildJsonResponse(
-                $expression->args,
-                $scopeMethod,
-                $runtimeClass,
-                $bindings,
-            );
+            $method = $this->identifierName($expression->name);
+
+            if ($method === 'noContent') {
+                return $this->buildNoContentResponse(
+                    $expression->args,
+                    $scopeMethod,
+                    $runtimeClass,
+                    $bindings,
+                );
+            }
+
+            if ($method === 'json') {
+                return $this->buildJsonResponse(
+                    $expression->args,
+                    $scopeMethod,
+                    $runtimeClass,
+                    $bindings,
+                );
+            }
         }
 
         if ($expression instanceof StaticCall
-            && $this->identifierName($expression->name) === 'json'
             && $this->nameLastPart($expression->class) === 'Response') {
-            return $this->buildJsonResponse(
-                $expression->args,
+            $method = $this->identifierName($expression->name);
+
+            if ($method === 'noContent') {
+                return $this->buildNoContentResponse(
+                    $expression->args,
+                    $scopeMethod,
+                    $runtimeClass,
+                    $bindings,
+                );
+            }
+
+            if ($method === 'json') {
+                return $this->buildJsonResponse(
+                    $expression->args,
+                    $scopeMethod,
+                    $runtimeClass,
+                    $bindings,
+                );
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  array<int, Arg>  $arguments
+     * @param  array<string, array<string, mixed>>  $bindings
+     * @return array{status_code: int, schema: array<string, mixed>, example: null}
+     */
+    protected function buildNoContentResponse(
+        array $arguments,
+        ReflectionMethod $scopeMethod,
+        ReflectionClass $runtimeClass,
+        array $bindings,
+    ): array {
+        $statusCode = 204;
+        $statusExpression = $this->argumentExpression($arguments, 'status', 0);
+
+        if ($statusExpression instanceof Expr) {
+            $status = $this->inferValue(
+                $statusExpression,
+                'status',
                 $scopeMethod,
                 $runtimeClass,
                 $bindings,
             );
+
+            if (is_int($status['example'] ?? null)) {
+                $statusCode = $status['example'];
+            }
         }
 
-        return null;
+        return [
+            'status_code' => $statusCode,
+            'schema' => [],
+            'example' => null,
+        ];
     }
 
     /**

@@ -12,13 +12,12 @@ use ReflectionNamedType;
 /**
  * Analyzes controller return types and extracts response structures.
  *
- * Priority order:
- * 1. PHPDoc @response annotations
- * 2. API Resource classes
- * 3. response()->json() calls
- * 4. Custom response helper pipelines
- * 5. Model return types
- * 6. Fallback default response
+ * Distinct HTTP status codes are combined from PHPDoc annotations,
+ * API Resources, direct Laravel responses, response helper pipelines,
+ * Eloquent model returns, and framework-inferred responses.
+ *
+ * When multiple sources describe the same status code, the earlier
+ * explicit source is kept.
  */
 class ResponseExtractorService implements ResponseExtractorInterface
 {
