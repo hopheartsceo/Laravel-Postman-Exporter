@@ -19,6 +19,7 @@ Automatically generate **Postman Collection v2.1** files and **OpenAPI 3.0** spe
 - **Folder Grouping** — Organizes requests into folders based on route prefixes
 - **Response Examples** — Extracts response structures from PHPDoc, API Resources, `response()->json()`, and Eloquent models
 - **Response Contract Analysis** — Builds OpenAPI schemas from Laravel API Resources, including conditional fields, nested resources, collections, pagination, and top-level metadata
+- **Multi-Response Contracts** — Captures multiple response branches/status codes and Laravel's default validation 422 contract
 - **Response Pipeline Tracing** — Statically follows controller, trait, inherited, and static response helpers to discover wrapped payloads and status codes without executing endpoints
 - **OpenAPI Support** — Export your API as a valid OpenAPI 3.0.3 specification
 - **Postman Upload** — Optionally upload generated Postman collections directly via the Postman API
@@ -170,9 +171,11 @@ Or enable at export time with the `--with-responses` flag:
 php artisan postman:export --with-responses
 ```
 
-**Extraction priority (highest to lowest):**
+**Response discovery sources:**
 
-1. **PHPDoc `@response`** — Parses `@response` tags with optional status codes:
+The exporter combines distinct HTTP status codes from multiple sources instead of stopping at the first match. When two sources describe the same status, the earlier explicit source wins.
+
+1. **PHPDoc `@response`** — Parses one or more `@response` tags with optional status codes:
    ```php
    /**
     * @response 200 {"id": 1, "name": "John Doe"}
@@ -192,6 +195,8 @@ php artisan postman:export --with-responses
 6. **Fallback** — Uses the configured fallback status and body. By default, the body is `null` so unknown responses are not documented as fabricated success payloads.
 
 Response pipelines are analyzed statically. Controller endpoints and response helpers are not executed during export or contract checks.
+
+When validation rules are detected, the exporter also adds Laravel's default JSON `422` validation-error contract. This inference is skipped when a FormRequest overrides `failedValidation()`, and it can be disabled with `responses.framework_validation_errors`.
 
 **Generated response format in Postman:**
 

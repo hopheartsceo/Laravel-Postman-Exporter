@@ -25,6 +25,7 @@ class ResponseExtractorService implements ResponseExtractorInterface
     public function __construct(
         protected ?ResourceSchemaAnalyzerService $resourceAnalyzer = null,
         protected ?ResponsePipelineTracerService $pipelineTracer = null,
+        protected ?FrameworkErrorResponseService $frameworkErrorAnalyzer = null,
     ) {}
 
     /**
@@ -48,38 +49,46 @@ class ResponseExtractorService implements ResponseExtractorInterface
             return [$this->buildFallbackResponse()];
         }
 
-        // 1. Try PHPDoc @response annotation
-        $phpDocResponse = $this->extractFromPhpDoc($reflection);
-        if ($phpDocResponse !== null) {
-            return [$phpDocResponse];
-        }
+        $responses = $this->extractAllFromPhpDoc($reflection);
 
-        // 2. Try API Resource return type
         $resourceResponse = $this->extractFromApiResource($reflection);
         if ($resourceResponse !== null) {
-            return [$resourceResponse];
+            $responses[] = $resourceResponse;
         }
 
-        // 3. Try response()->json() calls in source
-        $jsonResponse = $this->extractFromJsonResponse($reflection);
-        if ($jsonResponse !== null) {
-            return [$jsonResponse];
+        $pipelineResponses = $this->extractAllFromResponsePipeline($reflection);
+
+        if ($pipelineResponses !== []) {
+            $responses = array_merge($responses, $pipelineResponses);
+        } else {
+            // Keep the legacy source parser only as a fallback for response
+            // forms that the AST tracer does not understand yet, such as
+            // response()->noContent().
+            $jsonResponse = $this->extractFromJsonResponse($reflection);
+
+            if ($jsonResponse !== null) {
+                $responses[] = $jsonResponse;
+            }
         }
 
-        // 4. Try custom response helper pipeline
-        $pipelineResponse = $this->extractFromResponsePipeline($reflection);
-        if ($pipelineResponse !== null) {
-            return [$pipelineResponse];
-        }
-
-        // 5. Try Model return type
         $modelResponse = $this->extractFromModelReturn($reflection);
         if ($modelResponse !== null) {
-            return [$modelResponse];
+            $responses[] = $modelResponse;
         }
 
-        // 6. Fallback
-        return [$this->buildFallbackResponse()];
+        if ($responses === []) {
+            $responses[] = $this->buildFallbackResponse();
+        }
+
+        $frameworkAnalyzer = $this->frameworkErrorAnalyzer
+            ?? new FrameworkErrorResponseService();
+
+        $responses = array_merge(
+            $responses,
+            $frameworkAnalyzer->analyze($routeData, $reflection),
+        );
+
+        return $this->deduplicateResponses($responses);
     }
 
     /**
@@ -89,31 +98,137 @@ class ResponseExtractorService implements ResponseExtractorInterface
      */
     protected function extractFromPhpDoc(ReflectionMethod $method): ?array
     {
+        $responses = $this->extractAllFromPhpDoc($method);
+
+        return $responses[0] ?? null;
+    }
+
+    /**
+     * Extract every valid @response annotation from a controller method.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    protected function extractAllFromPhpDoc(ReflectionMethod $method): array
+    {
         $docComment = $method->getDocComment();
+
         if ($docComment === false) {
+            return [];
+        }
+
+        $normalized = preg_replace('/^\s*\/?\*+\s?/m', '', $docComment);
+        $normalized = preg_replace('/^\s*\*\s?/m', '', (string) $normalized);
+        $responses = [];
+
+        if (! preg_match_all(
+            '/@response\s+(?:(\d{3})\s+)?/m',
+            (string) $normalized,
+            $matches,
+            PREG_OFFSET_CAPTURE,
+        )) {
+            return [];
+        }
+
+        foreach ($matches[0] as $index => $match) {
+            $start = $match[1] + strlen($match[0]);
+            $jsonStart = $this->findJsonStart((string) $normalized, $start);
+
+            if ($jsonStart === null) {
+                continue;
+            }
+
+            $json = $this->extractBalancedJson((string) $normalized, $jsonStart);
+
+            if ($json === null) {
+                continue;
+            }
+
+            try {
+                $decoded = json_decode($json, true, 512, JSON_THROW_ON_ERROR);
+            } catch (\Throwable) {
+                continue;
+            }
+
+            $statusMatch = $matches[1][$index][0] ?? '';
+            $statusCode = $statusMatch !== '' ? (int) $statusMatch : 200;
+
+            $responses[] = [
+                'source' => 'phpdoc',
+                'status_code' => $statusCode,
+                'status_text' => $this->getStatusText($statusCode),
+                'body' => $decoded,
+                'name' => $statusCode >= 400 ? 'Error Response' : 'Success Response',
+            ];
+        }
+
+        return $responses;
+    }
+
+    protected function findJsonStart(string $source, int $offset): ?int
+    {
+        $length = strlen($source);
+
+        for ($i = $offset; $i < $length; $i++) {
+            if ($source[$i] === '{' || $source[$i] === '[') {
+                return $i;
+            }
+
+            if (substr($source, $i, 9) === '@response') {
+                return null;
+            }
+        }
+
+        return null;
+    }
+
+    protected function extractBalancedJson(string $source, int $start): ?string
+    {
+        $open = $source[$start] ?? null;
+
+        if ($open !== '{' && $open !== '[') {
             return null;
         }
 
-        // Match @response { ... } or @response 200 { ... }
-        // The JSON may span multiple lines in the docblock with leading "* " on each line.
-        if (preg_match('/@response\s+(?:(\d{3})\s+)?(\{[\s\S]*?\})/s', $docComment, $matches)) {
-            $statusCode = ! empty($matches[1]) ? (int) $matches[1] : 200;
-            $jsonBody = $matches[2];
+        $close = $open === '{' ? '}' : ']';
+        $depth = 0;
+        $inString = false;
+        $escaped = false;
+        $length = strlen($source);
 
-            // Strip docblock line prefixes: lines that start with optional whitespace then "* "
-            $jsonBody = preg_replace('/^\s*\*\s?/m', '', $jsonBody);
-            $jsonBody = trim($jsonBody);
+        for ($i = $start; $i < $length; $i++) {
+            $char = $source[$i];
 
-            // Validate it's valid JSON
-            $decoded = json_decode($jsonBody, true);
-            if (json_last_error() === JSON_ERROR_NONE) {
-                return [
-                    'source' => 'phpdoc',
-                    'status_code' => $statusCode,
-                    'status_text' => $this->getStatusText($statusCode),
-                    'body' => $decoded,
-                    'name' => 'Fallback Response',
-                ];
+            if ($inString) {
+                if ($escaped) {
+                    $escaped = false;
+                    continue;
+                }
+
+                if ($char === '\\') {
+                    $escaped = true;
+                    continue;
+                }
+
+                if ($char === '"') {
+                    $inString = false;
+                }
+
+                continue;
+            }
+
+            if ($char === '"') {
+                $inString = true;
+                continue;
+            }
+
+            if ($char === $open) {
+                $depth++;
+            } elseif ($char === $close) {
+                $depth--;
+
+                if ($depth === 0) {
+                    return substr($source, $start, $i - $start + 1);
+                }
             }
         }
 
@@ -306,25 +421,37 @@ class ResponseExtractorService implements ResponseExtractorInterface
      */
     protected function extractFromResponsePipeline(ReflectionMethod $method): ?array
     {
+        $responses = $this->extractAllFromResponsePipeline($method);
+
+        return $responses[0] ?? null;
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    protected function extractAllFromResponsePipeline(ReflectionMethod $method): array
+    {
         $tracer = $this->pipelineTracer
             ?? new ResponsePipelineTracerService(
                 $this->resourceAnalyzer ?? new ResourceSchemaAnalyzerService(),
             );
 
-        $contract = $tracer->trace($method);
+        $responses = [];
 
-        if ($contract === null) {
-            return null;
+        foreach ($tracer->traceAll($method) as $contract) {
+            $statusCode = $contract['status_code'];
+
+            $responses[] = [
+                'source' => $contract['source'] ?? 'response_pipeline',
+                'status_code' => $statusCode,
+                'status_text' => $this->getStatusText($statusCode),
+                'body' => $contract['example'],
+                'schema' => $contract['schema'],
+                'name' => $statusCode >= 400 ? 'Error Response' : 'Success Response',
+            ];
         }
 
-        return [
-            'source' => 'response_pipeline',
-            'status_code' => $contract['status_code'],
-            'status_text' => $this->getStatusText($contract['status_code']),
-            'body' => $contract['example'],
-            'schema' => $contract['schema'],
-            'name' => 'Success Response',
-        ];
+        return $responses;
     }
 
     /**
@@ -378,6 +505,32 @@ class ResponseExtractorService implements ResponseExtractorInterface
         }
 
         return null;
+    }
+
+    /**
+     * Keep the first response for each status code. Source order is deliberate:
+     * annotations and explicit code win over framework-inferred responses.
+     *
+     * @param  array<int, array<string, mixed>>  $responses
+     * @return array<int, array<string, mixed>>
+     */
+    protected function deduplicateResponses(array $responses): array
+    {
+        $unique = [];
+        $seen = [];
+
+        foreach ($responses as $response) {
+            $statusCode = (int) ($response['status_code'] ?? 200);
+
+            if (isset($seen[$statusCode])) {
+                continue;
+            }
+
+            $seen[$statusCode] = true;
+            $unique[] = $response;
+        }
+
+        return $unique;
     }
 
     /**

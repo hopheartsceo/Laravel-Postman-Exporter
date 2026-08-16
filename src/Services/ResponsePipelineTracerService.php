@@ -48,8 +48,20 @@ class ResponsePipelineTracerService
      */
     public function trace(ReflectionMethod $method): ?array
     {
+        $contracts = $this->traceAll($method);
+
+        return $contracts[0] ?? null;
+    }
+
+    /**
+     * Trace every statically discoverable JSON/helper response branch.
+     *
+     * @return array<int, array{status_code: int, schema: array<string, mixed>, example: mixed}>
+     */
+    public function traceAll(ReflectionMethod $method): array
+    {
         try {
-            return $this->traceMethod(
+            return $this->traceMethodAll(
                 $method,
                 $method->getDeclaringClass(),
                 [],
@@ -57,7 +69,7 @@ class ResponsePipelineTracerService
                 [],
             );
         } catch (\Throwable) {
-            return null;
+            return [];
         }
     }
 
@@ -73,23 +85,80 @@ class ResponsePipelineTracerService
         int $depth,
         array $visited,
     ): ?array {
+        $contracts = $this->traceMethodAll(
+            $method,
+            $runtimeClass,
+            $bindings,
+            $depth,
+            $visited,
+        );
+
+        return $contracts[0] ?? null;
+    }
+
+    /**
+     * @param  array<string, array<string, mixed>>  $bindings
+     * @param  array<string, bool>  $visited
+     * @return array<int, array{status_code: int, schema: array<string, mixed>, example: mixed}>
+     */
+    protected function traceMethodAll(
+        ReflectionMethod $method,
+        ReflectionClass $runtimeClass,
+        array $bindings,
+        int $depth,
+        array $visited,
+    ): array {
         if ($depth > 8) {
-            return null;
+            return [];
         }
 
         $key = $runtimeClass->getName() . '::' . $method->getName();
 
         if (isset($visited[$key])) {
-            return null;
+            return [];
         }
 
         $statements = $this->methodStatements($method);
 
         if ($statements === null) {
-            return null;
+            return [];
         }
 
         $visited[$key] = true;
+
+        return $this->deduplicateContracts(
+            $this->traceStatements(
+                $statements,
+                $method,
+                $runtimeClass,
+                $bindings,
+                $depth,
+                $visited,
+            ),
+        );
+    }
+
+    /**
+     * Walk executable statements in source order so each return sees the
+     * variable bindings that exist at that point in the branch.
+     *
+     * Closures and arrow functions are intentionally not traversed because
+     * their return statements do not describe the controller response.
+     *
+     * @param  array<int, Stmt>  $statements
+     * @param  array<string, array<string, mixed>>  $bindings
+     * @param  array<string, bool>  $visited
+     * @return array<int, array{status_code: int, schema: array<string, mixed>, example: mixed}>
+     */
+    protected function traceStatements(
+        array $statements,
+        ReflectionMethod $method,
+        ReflectionClass $runtimeClass,
+        array $bindings,
+        int $depth,
+        array $visited,
+    ): array {
+        $contracts = [];
         $localBindings = $bindings;
 
         foreach ($statements as $statement) {
@@ -109,19 +178,149 @@ class ResponsePipelineTracerService
                 continue;
             }
 
-            if ($statement instanceof Stmt\Return_ && $statement->expr instanceof Expr) {
-                return $this->traceReturn(
-                    $statement->expr,
-                    $method,
-                    $runtimeClass,
-                    $localBindings,
-                    $depth,
-                    $visited,
+            if ($statement instanceof Stmt\Return_) {
+                if ($statement->expr instanceof Expr) {
+                    $contracts = array_merge(
+                        $contracts,
+                        $this->traceReturnAll(
+                            $statement->expr,
+                            $method,
+                            $runtimeClass,
+                            $localBindings,
+                            $depth,
+                            $visited,
+                        ),
+                    );
+                }
+
+                break;
+            }
+
+            if ($statement instanceof Stmt\If_) {
+                $contracts = array_merge(
+                    $contracts,
+                    $this->traceStatements(
+                        $statement->stmts,
+                        $method,
+                        $runtimeClass,
+                        $localBindings,
+                        $depth,
+                        $visited,
+                    ),
+                );
+
+                foreach ($statement->elseifs as $elseif) {
+                    $contracts = array_merge(
+                        $contracts,
+                        $this->traceStatements(
+                            $elseif->stmts,
+                            $method,
+                            $runtimeClass,
+                            $localBindings,
+                            $depth,
+                            $visited,
+                        ),
+                    );
+                }
+
+                if ($statement->else !== null) {
+                    $contracts = array_merge(
+                        $contracts,
+                        $this->traceStatements(
+                            $statement->else->stmts,
+                            $method,
+                            $runtimeClass,
+                            $localBindings,
+                            $depth,
+                            $visited,
+                        ),
+                    );
+                }
+
+                continue;
+            }
+
+            if ($statement instanceof Stmt\Switch_) {
+                foreach ($statement->cases as $case) {
+                    $contracts = array_merge(
+                        $contracts,
+                        $this->traceStatements(
+                            $case->stmts,
+                            $method,
+                            $runtimeClass,
+                            $localBindings,
+                            $depth,
+                            $visited,
+                        ),
+                    );
+                }
+
+                continue;
+            }
+
+            if ($statement instanceof Stmt\TryCatch) {
+                $contracts = array_merge(
+                    $contracts,
+                    $this->traceStatements(
+                        $statement->stmts,
+                        $method,
+                        $runtimeClass,
+                        $localBindings,
+                        $depth,
+                        $visited,
+                    ),
+                );
+
+                foreach ($statement->catches as $catch) {
+                    $contracts = array_merge(
+                        $contracts,
+                        $this->traceStatements(
+                            $catch->stmts,
+                            $method,
+                            $runtimeClass,
+                            $localBindings,
+                            $depth,
+                            $visited,
+                        ),
+                    );
+                }
+
+                if ($statement->finally !== null) {
+                    $contracts = array_merge(
+                        $contracts,
+                        $this->traceStatements(
+                            $statement->finally->stmts,
+                            $method,
+                            $runtimeClass,
+                            $localBindings,
+                            $depth,
+                            $visited,
+                        ),
+                    );
+                }
+
+                continue;
+            }
+
+            if ($statement instanceof Stmt\Foreach_
+                || $statement instanceof Stmt\For_
+                || $statement instanceof Stmt\While_
+                || $statement instanceof Stmt\Do_) {
+                $contracts = array_merge(
+                    $contracts,
+                    $this->traceStatements(
+                        $statement->stmts,
+                        $method,
+                        $runtimeClass,
+                        $localBindings,
+                        $depth,
+                        $visited,
+                    ),
                 );
             }
         }
 
-        return null;
+        return $contracts;
     }
 
     /**
@@ -137,6 +336,83 @@ class ResponsePipelineTracerService
         int $depth,
         array $visited,
     ): ?array {
+        $contracts = $this->traceReturnAll(
+            $expression,
+            $scopeMethod,
+            $runtimeClass,
+            $bindings,
+            $depth,
+            $visited,
+        );
+
+        return $contracts[0] ?? null;
+    }
+
+    /**
+     * @param  array<string, array<string, mixed>>  $bindings
+     * @param  array<string, bool>  $visited
+     * @return array<int, array{status_code: int, schema: array<string, mixed>, example: mixed}>
+     */
+    protected function traceReturnAll(
+        Expr $expression,
+        ReflectionMethod $scopeMethod,
+        ReflectionClass $runtimeClass,
+        array $bindings,
+        int $depth,
+        array $visited,
+    ): array {
+        if ($expression instanceof Expr\Ternary) {
+            $contracts = [];
+
+            if ($expression->if instanceof Expr) {
+                $contracts = array_merge(
+                    $contracts,
+                    $this->traceReturnAll(
+                        $expression->if,
+                        $scopeMethod,
+                        $runtimeClass,
+                        $bindings,
+                        $depth,
+                        $visited,
+                    ),
+                );
+            }
+
+            $contracts = array_merge(
+                $contracts,
+                $this->traceReturnAll(
+                    $expression->else,
+                    $scopeMethod,
+                    $runtimeClass,
+                    $bindings,
+                    $depth,
+                    $visited,
+                ),
+            );
+
+            return $contracts;
+        }
+
+        if ($expression instanceof Expr\Match_) {
+            $contracts = [];
+
+            foreach ($expression->arms as $arm) {
+                $contracts = array_merge(
+                    $contracts,
+                    $this->traceReturnAll(
+                        $arm->body,
+                        $scopeMethod,
+                        $runtimeClass,
+                        $bindings,
+                        $depth,
+                        $visited,
+                    ),
+                );
+            }
+
+            return $contracts;
+        }
+
         $terminal = $this->traceJsonResponse(
             $expression,
             $scopeMethod,
@@ -145,18 +421,22 @@ class ResponsePipelineTracerService
         );
 
         if ($terminal !== null) {
-            return $terminal;
+            $terminal['source'] = $depth === 0
+                ? 'json_response'
+                : 'response_pipeline';
+
+            return [$terminal];
         }
 
         $helper = $this->resolveHelper($expression, $scopeMethod, $runtimeClass);
 
         if ($helper === null) {
-            return null;
+            return [];
         }
 
         [$helperMethod, $helperRuntimeClass] = $helper;
 
-        return $this->traceMethod(
+        return $this->traceMethodAll(
             $helperMethod,
             $helperRuntimeClass,
             $this->bindArguments(
@@ -881,6 +1161,30 @@ class ResponsePipelineTracerService
         }
 
         return is_string($identifier) ? $identifier : null;
+    }
+
+    /**
+     * @param  array<int, array{status_code: int, schema: array<string, mixed>, example: mixed}>  $contracts
+     * @return array<int, array{status_code: int, schema: array<string, mixed>, example: mixed}>
+     */
+    protected function deduplicateContracts(array $contracts): array
+    {
+        $unique = [];
+        $seen = [];
+
+        foreach ($contracts as $contract) {
+            $key = (string) $contract['status_code']
+                . ':' . md5((string) json_encode($contract['schema']));
+
+            if (isset($seen[$key])) {
+                continue;
+            }
+
+            $seen[$key] = true;
+            $unique[] = $contract;
+        }
+
+        return $unique;
     }
 
     protected function nameLastPart(Node $node): ?string

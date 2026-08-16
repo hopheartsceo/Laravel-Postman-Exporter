@@ -149,18 +149,24 @@ return [
     | fallback_status: Default HTTP status code when no response is detected.
     | fallback_body: Default response body when no response is detected.
     |
-    | Response sources (in priority order):
-    | 1. PHPDoc @response annotations
-    | 2. API Resource classes
-    | 3. response()->json() calls
-    | 4. Model return types
-    | 5. Fallback default response
+    | Response sources are combined by distinct HTTP status code:
+    | - PHPDoc @response annotations
+    | - API Resource classes
+    | - response()->json() calls
+    | - Custom response helper pipelines
+    | - Eloquent model returns
+    | - Laravel default validation errors
+    | - Fallback response when no success response can be inferred
     |
     */
     'responses' => [
         'enabled' => true,
         'fallback_status' => 200,
         'fallback_body' => null,
+
+        // Add Laravel's default JSON 422 contract when validation rules are detected.
+        // Automatically skipped for FormRequests that override failedValidation().
+        'framework_validation_errors' => true,
     ],
 
     /*

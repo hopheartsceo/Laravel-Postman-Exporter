@@ -14,6 +14,7 @@ use Hopheartsceo\PostmanExporter\Services\ExampleDataGeneratorService;
 use Hopheartsceo\PostmanExporter\Services\ExampleResponseGeneratorService;
 use Hopheartsceo\PostmanExporter\Services\FolderOrganizerService;
 use Hopheartsceo\PostmanExporter\Services\FormRequestRulesResolverService;
+use Hopheartsceo\PostmanExporter\Services\FrameworkErrorResponseService;
 use Hopheartsceo\PostmanExporter\Services\OpenApiExporterService;
 use Hopheartsceo\PostmanExporter\Services\PostmanCollectionBuilderService;
 use Hopheartsceo\PostmanExporter\Services\PostmanUploaderService;
@@ -98,10 +99,15 @@ class PostmanExporterServiceProvider extends ServiceProvider
             );
         });
 
+        $this->app->singleton(FrameworkErrorResponseService::class, function () {
+            return new FrameworkErrorResponseService();
+        });
+
         $this->app->singleton(ResponseExtractorService::class, function ($app) {
             return new ResponseExtractorService(
                 $app->make(ResourceSchemaAnalyzerService::class),
                 $app->make(ResponsePipelineTracerService::class),
+                $app->make(FrameworkErrorResponseService::class),
             );
         });
 
