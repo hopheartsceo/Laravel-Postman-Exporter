@@ -8,6 +8,7 @@ use Hopheartsceo\PostmanExporter\Services\ResponseExtractorService;
 use Hopheartsceo\PostmanExporter\Tests\TestCase;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Symfony\Component\HttpFoundation\Response as HttpResponse;
 
 class ResponsePipelineTracerTest extends TestCase
 {
@@ -81,6 +82,31 @@ class ResponsePipelineTracerTest extends TestCase
         $this->assertSame(201, $response['status_code']);
         $this->assertSame('Named created', $response['body']['message']);
         $this->assertArrayHasKey('email', $response['schema']['properties']['data']['properties']);
+    }
+
+    public function test_supports_named_arguments_on_terminal_json_response(): void
+    {
+        $response = $this->extract(PipelineNamedTerminalController::class, 'store');
+
+        $this->assertSame('response_pipeline', $response['source']);
+        $this->assertSame(201, $response['status_code']);
+        $this->assertTrue($response['body']['success']);
+        $this->assertArrayHasKey(
+            'email',
+            $response['schema']['properties']['data']['properties'],
+        );
+    }
+
+    public function test_resolves_http_status_class_constants(): void
+    {
+        $response = $this->extract(PipelineStatusConstantController::class, 'store');
+
+        $this->assertSame('response_pipeline', $response['source']);
+        $this->assertSame(201, $response['status_code']);
+        $this->assertArrayHasKey(
+            'email',
+            $response['schema']['properties']['data']['properties'],
+        );
     }
 
     /** @return array<string, mixed> */
@@ -207,6 +233,50 @@ class PipelineNamedArgumentsController
             data: new PipelineUserResource((object) []),
             message: 'Named created',
         );
+    }
+}
+
+class PipelineNamedTerminalController
+{
+    public function store()
+    {
+        return PipelineNamedTerminalResponder::created(
+            new PipelineUserResource((object) []),
+        );
+    }
+}
+
+class PipelineNamedTerminalResponder
+{
+    public static function created(mixed $data)
+    {
+        return response()->json(
+            status: 201,
+            data: [
+                'success' => true,
+                'data' => $data,
+            ],
+        );
+    }
+}
+
+class PipelineStatusConstantController
+{
+    public function store()
+    {
+        return PipelineStatusConstantResponder::created(
+            new PipelineUserResource((object) []),
+        );
+    }
+}
+
+class PipelineStatusConstantResponder
+{
+    public static function created(mixed $data)
+    {
+        return response()->json([
+            'data' => $data,
+        ], HttpResponse::HTTP_CREATED);
     }
 }
 

@@ -217,9 +217,10 @@ class ResponsePipelineTracerService
         ReflectionClass $runtimeClass,
         array $bindings,
     ): array {
-        $payload = isset($arguments[0])
+        $payloadExpression = $this->argumentExpression($arguments, 'data', 0);
+        $payload = $payloadExpression instanceof Expr
             ? $this->inferValue(
-                $arguments[0]->value,
+                $payloadExpression,
                 'data',
                 $scopeMethod,
                 $runtimeClass,
@@ -228,10 +229,11 @@ class ResponsePipelineTracerService
             : $this->literalContract(null);
 
         $statusCode = 200;
+        $statusExpression = $this->argumentExpression($arguments, 'status', 1);
 
-        if (isset($arguments[1])) {
+        if ($statusExpression instanceof Expr) {
             $status = $this->inferValue(
-                $arguments[1]->value,
+                $statusExpression,
                 'status',
                 $scopeMethod,
                 $runtimeClass,
@@ -248,6 +250,33 @@ class ResponsePipelineTracerService
             'schema' => $payload['schema'],
             'example' => $payload['example'],
         ];
+    }
+
+    /**
+     * Resolve positional or named arguments using the target method's parameter name.
+     *
+     * @param  array<int, Arg>  $arguments
+     */
+    protected function argumentExpression(
+        array $arguments,
+        string $name,
+        int $position,
+    ): ?Expr {
+        foreach ($arguments as $argument) {
+            if ($argument->name instanceof Node\Identifier
+                && $argument->name->toString() === $name) {
+                return $argument->value;
+            }
+        }
+
+        $positioned = array_values(array_filter(
+            $arguments,
+            static fn (Arg $argument): bool => $argument->name === null,
+        ));
+
+        return isset($positioned[$position])
+            ? $positioned[$position]->value
+            : null;
     }
 
     /**
@@ -419,6 +448,28 @@ class ResponsePipelineTracerService
                 'null' => $this->literalContract(null),
                 default => $this->fallbackContract($fieldName),
             };
+        }
+
+        if ($expression instanceof Expr\ClassConstFetch
+            && $expression->name instanceof Node\Identifier) {
+            $className = $this->resolveClassName(
+                $expression->class,
+                $scopeMethod,
+                $runtimeClass,
+            );
+
+            if ($className !== null) {
+                try {
+                    $constant = (new ReflectionClass($className))
+                        ->getReflectionConstant($expression->name->toString());
+
+                    if ($constant !== false) {
+                        return $this->literalContract($constant->getValue());
+                    }
+                } catch (\Throwable) {
+                    // Fall through to the inferred fallback below.
+                }
+            }
         }
 
         if ($expression instanceof Expr\Cast\Int_) {
