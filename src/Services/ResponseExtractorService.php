@@ -21,6 +21,10 @@ use ReflectionNamedType;
  */
 class ResponseExtractorService implements ResponseExtractorInterface
 {
+    public function __construct(
+        protected ?ResourceSchemaAnalyzerService $resourceAnalyzer = null,
+    ) {}
+
     /**
      * Extract response information from a controller method.
      *
@@ -109,75 +113,107 @@ class ResponseExtractorService implements ResponseExtractorInterface
     }
 
     /**
-     * Extract response from API Resource return type.
+     * Extract response from an API Resource.
      *
      * @return array<string, mixed>|null
      */
     protected function extractFromApiResource(ReflectionMethod $method): ?array
     {
-        // Check return type hint
+        $source = $this->getMethodSource($method);
+        $paginated = $source !== null && $this->isPaginatedResourceSource($source);
+        $statusCode = $source !== null ? $this->extractResourceStatusCode($source) : 200;
+
         $returnType = $method->getReturnType();
         if ($returnType instanceof ReflectionNamedType && ! $returnType->isBuiltin()) {
             $className = $returnType->getName();
+
             if ($this->isApiResource($className)) {
-                $fields = $this->extractResourceFields($className);
-                if (! empty($fields)) {
-                    return [
-                        'source' => 'api_resource',
-                        'status_code' => 200,
-                        'status_text' => 'OK',
-                        'body' => ['data' => $fields],
-                        'name' => 'Success Response',
-                    ];
-                }
+                return $this->buildResourceResponse(
+                    $className,
+                    $this->isResourceCollection($className),
+                    $paginated,
+                    $statusCode,
+                );
             }
         }
 
-        // Check source code for "new XxxResource(" pattern
-        $source = $this->getMethodSource($method);
         if ($source === null) {
             return null;
         }
 
-        // Match: return new XxxResource(...)
-        if (preg_match('/return\s+new\s+([A-Z][\w\\\\]*Resource)\s*\(/s', $source, $matches)) {
-            $resourceClass = $matches[1];
-            $resolvedClass = $this->resolveClassName($resourceClass, $method);
+        if (preg_match('/return\s+([A-Z][\w\\\\]*Resource)::collection\s*\(/s', $source, $matches)) {
+            $resolvedClass = $this->resolveClassName($matches[1], $method);
 
             if ($resolvedClass && $this->isApiResource($resolvedClass)) {
-                $fields = $this->extractResourceFields($resolvedClass);
-                if (! empty($fields)) {
-                    return [
-                        'source' => 'api_resource',
-                        'status_code' => 200,
-                        'status_text' => 'OK',
-                        'body' => ['data' => $fields],
-                        'name' => 'Success Response',
-                    ];
-                }
+                return $this->buildResourceResponse(
+                    $resolvedClass,
+                    true,
+                    $paginated,
+                    $statusCode,
+                );
             }
         }
 
-        // Match: return XxxResource::collection(...)
-        if (preg_match('/return\s+([A-Z][\w\\\\]*Resource)::collection\s*\(/s', $source, $matches)) {
-            $resourceClass = $matches[1];
-            $resolvedClass = $this->resolveClassName($resourceClass, $method);
+        if (preg_match('/return\s+\(?\s*new\s+([A-Z][\w\\\\]*)\s*\(/s', $source, $matches)) {
+            $resolvedClass = $this->resolveClassName($matches[1], $method);
 
             if ($resolvedClass && $this->isApiResource($resolvedClass)) {
-                $fields = $this->extractResourceFields($resolvedClass);
-                if (! empty($fields)) {
-                    return [
-                        'source' => 'api_resource',
-                        'status_code' => 200,
-                        'status_text' => 'OK',
-                        'body' => ['data' => [$fields]],
-                        'name' => 'Success Response',
-                    ];
-                }
+                return $this->buildResourceResponse(
+                    $resolvedClass,
+                    $this->isResourceCollection($resolvedClass),
+                    $paginated,
+                    $statusCode,
+                );
             }
         }
 
         return null;
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    protected function buildResourceResponse(
+        string $resourceClass,
+        bool $collection,
+        bool $paginated,
+        int $statusCode,
+    ): ?array {
+        $analyzer = $this->resourceAnalyzer ?? new ResourceSchemaAnalyzerService();
+        $contract = $analyzer->analyzeResponse($resourceClass, $collection, $paginated);
+
+        if ($contract === null) {
+            return null;
+        }
+
+        return [
+            'source' => 'api_resource',
+            'status_code' => $statusCode,
+            'status_text' => $this->getStatusText($statusCode),
+            'body' => $contract['example'],
+            'schema' => $contract['schema'],
+            'name' => 'Success Response',
+        ];
+    }
+
+    protected function isResourceCollection(string $className): bool
+    {
+        return class_exists($className)
+            && is_subclass_of($className, 'Illuminate\\Http\\Resources\\Json\\ResourceCollection');
+    }
+
+    protected function isPaginatedResourceSource(string $source): bool
+    {
+        return (bool) preg_match('/(?:paginate|simplePaginate|cursorPaginate)\s*\(/', $source);
+    }
+
+    protected function extractResourceStatusCode(string $source): int
+    {
+        if (preg_match('/->\s*(?:response|toResponse)\s*\([^)]*\)\s*->\s*setStatusCode\s*\(\s*(\d{3})\s*\)/s', $source, $matches)) {
+            return (int) $matches[1];
+        }
+
+        return 200;
     }
 
     /**
@@ -354,69 +390,6 @@ class ResponseExtractorService implements ResponseExtractorInterface
         return false;
     }
 
-    /**
-     * Extract fields from an API Resource's toArray method.
-     *
-     * @return array<string, mixed>
-     */
-    protected function extractResourceFields(string $className): array
-    {
-        if (! class_exists($className)) {
-            return [];
-        }
-
-        try {
-            $reflection = new ReflectionClass($className);
-
-            if (! $reflection->hasMethod('toArray')) {
-                return [];
-            }
-
-            $method = $reflection->getMethod('toArray');
-
-            // Skip if toArray is inherited from the base resource class
-            if ($method->getDeclaringClass()->getName() !== $className) {
-                return [];
-            }
-
-            $source = $this->getMethodSource($method);
-            if ($source === null) {
-                return [];
-            }
-
-            // Try to extract the returned array structure
-            if (preg_match('/return\s+(\[[\s\S]*?\])\s*;/s', $source, $matches)) {
-                $fields = $this->parseResourceArray($matches[1]);
-                if (! empty($fields)) {
-                    return $fields;
-                }
-            }
-        } catch (\Throwable) {
-            // ignore
-        }
-
-        return [];
-    }
-
-    /**
-     * Parse a resource array definition to extract field names.
-     *
-     * @return array<string, mixed>
-     */
-    protected function parseResourceArray(string $arrayStr): array
-    {
-        $fields = [];
-
-        // Match 'key' => $this->xxx or 'key' => value patterns
-        if (preg_match_all("/['\"](\w+)['\"]\s*=>/", $arrayStr, $matches)) {
-            $exampleGenerator = new ExampleDataGeneratorService();
-            foreach ($matches[1] as $fieldName) {
-                $fields[$fieldName] = $exampleGenerator->inferFromFieldName($fieldName);
-            }
-        }
-
-        return $fields;
-    }
 
     /**
      * Check if a class is an Eloquent Model.

@@ -207,12 +207,25 @@ class ContractDiffService
         $baselineProperties = is_array($baseline['properties'] ?? null) ? $baseline['properties'] : [];
         $currentProperties = is_array($current['properties'] ?? null) ? $current['properties'] : [];
 
-        if ($direction === 'request') {
-            $currentRequired = array_values(array_filter($current['required'] ?? [], 'is_string'));
-            $baselineRequired = array_values(array_filter($baseline['required'] ?? [], 'is_string'));
+        $currentRequired = array_values(array_filter($current['required'] ?? [], 'is_string'));
+        $baselineRequired = array_values(array_filter($baseline['required'] ?? [], 'is_string'));
 
+        if ($direction === 'request') {
             foreach (array_diff($currentRequired, $baselineRequired) as $requiredField) {
                 $changes[] = $label . ': required request field added: ' . $this->joinPath($fieldPath, $requiredField);
+            }
+        } elseif ($direction === 'response') {
+            foreach (array_diff($baselineRequired, $currentRequired) as $requiredField) {
+                if (! isset($currentProperties[$requiredField])) {
+                    continue;
+                }
+
+                $changes[] = $this->schemaMessage(
+                    $label,
+                    $direction,
+                    $status,
+                    'field became optional: ' . $this->joinPath($fieldPath, $requiredField),
+                );
             }
         }
 

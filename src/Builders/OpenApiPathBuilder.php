@@ -111,7 +111,9 @@ class OpenApiPathBuilder
             if ($body !== null && $statusCode !== '204') {
                 $openApiResponse['content'] = [
                     'application/json' => [
-                        'schema' => $this->inferResponseSchema($body),
+                        'schema' => is_array($response['schema'] ?? null)
+                            ? $response['schema']
+                            : $this->inferResponseSchema($body),
                         'example' => $body,
                     ],
                 ];

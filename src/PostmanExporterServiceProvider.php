@@ -19,6 +19,7 @@ use Hopheartsceo\PostmanExporter\Services\PostmanCollectionBuilderService;
 use Hopheartsceo\PostmanExporter\Services\PostmanUploaderService;
 use Hopheartsceo\PostmanExporter\Services\RequestAnalyzerService;
 use Hopheartsceo\PostmanExporter\Services\ResponseExtractorService;
+use Hopheartsceo\PostmanExporter\Services\ResourceSchemaAnalyzerService;
 use Hopheartsceo\PostmanExporter\Services\RouteScannerService;
 use Hopheartsceo\PostmanExporter\Services\ValidationParserService;
 use Hopheartsceo\PostmanExporter\Contracts\FolderOrganizerInterface;
@@ -83,8 +84,16 @@ class PostmanExporterServiceProvider extends ServiceProvider
 
         $this->app->bind(FolderOrganizerInterface::class, FolderOrganizerService::class);
 
-        $this->app->singleton(ResponseExtractorService::class, function () {
-            return new ResponseExtractorService();
+        $this->app->singleton(ResourceSchemaAnalyzerService::class, function ($app) {
+            return new ResourceSchemaAnalyzerService(
+                $app->make(ExampleDataGeneratorService::class),
+            );
+        });
+
+        $this->app->singleton(ResponseExtractorService::class, function ($app) {
+            return new ResponseExtractorService(
+                $app->make(ResourceSchemaAnalyzerService::class),
+            );
         });
 
         $this->app->bind(ResponseExtractorInterface::class, ResponseExtractorService::class);

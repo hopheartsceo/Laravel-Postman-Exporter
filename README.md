@@ -18,6 +18,7 @@ Automatically generate **Postman Collection v2.1** files and **OpenAPI 3.0** spe
 - **Authentication Detection** — Automatically adds auth headers based on middleware (Sanctum, Passport, etc.)
 - **Folder Grouping** — Organizes requests into folders based on route prefixes
 - **Response Examples** — Extracts response structures from PHPDoc, API Resources, `response()->json()`, and Eloquent models
+- **Response Contract Analysis** — Builds OpenAPI schemas from Laravel API Resources, including conditional fields, nested resources, collections, pagination, and top-level metadata
 - **OpenAPI Support** — Export your API as a valid OpenAPI 3.0.3 specification
 - **Postman Upload** — Optionally upload generated Postman collections directly via the Postman API
 - **Artisan Command** — Beautiful CLI with progress indicators and colored output
