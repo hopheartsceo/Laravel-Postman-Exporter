@@ -19,6 +19,7 @@ use Hopheartsceo\PostmanExporter\Services\PostmanCollectionBuilderService;
 use Hopheartsceo\PostmanExporter\Services\PostmanUploaderService;
 use Hopheartsceo\PostmanExporter\Services\RequestAnalyzerService;
 use Hopheartsceo\PostmanExporter\Services\ResponseExtractorService;
+use Hopheartsceo\PostmanExporter\Services\ResponsePipelineTracerService;
 use Hopheartsceo\PostmanExporter\Services\ResourceSchemaAnalyzerService;
 use Hopheartsceo\PostmanExporter\Services\RouteScannerService;
 use Hopheartsceo\PostmanExporter\Services\ValidationParserService;
@@ -90,9 +91,17 @@ class PostmanExporterServiceProvider extends ServiceProvider
             );
         });
 
+        $this->app->singleton(ResponsePipelineTracerService::class, function ($app) {
+            return new ResponsePipelineTracerService(
+                $app->make(ResourceSchemaAnalyzerService::class),
+                $app->make(ExampleDataGeneratorService::class),
+            );
+        });
+
         $this->app->singleton(ResponseExtractorService::class, function ($app) {
             return new ResponseExtractorService(
                 $app->make(ResourceSchemaAnalyzerService::class),
+                $app->make(ResponsePipelineTracerService::class),
             );
         });
 

@@ -16,13 +16,15 @@ use ReflectionNamedType;
  * 1. PHPDoc @response annotations
  * 2. API Resource classes
  * 3. response()->json() calls
- * 4. Model return types
- * 5. Fallback default response
+ * 4. Custom response helper pipelines
+ * 5. Model return types
+ * 6. Fallback default response
  */
 class ResponseExtractorService implements ResponseExtractorInterface
 {
     public function __construct(
         protected ?ResourceSchemaAnalyzerService $resourceAnalyzer = null,
+        protected ?ResponsePipelineTracerService $pipelineTracer = null,
     ) {}
 
     /**
@@ -64,13 +66,19 @@ class ResponseExtractorService implements ResponseExtractorInterface
             return [$jsonResponse];
         }
 
-        // 4. Try Model return type
+        // 4. Try custom response helper pipeline
+        $pipelineResponse = $this->extractFromResponsePipeline($reflection);
+        if ($pipelineResponse !== null) {
+            return [$pipelineResponse];
+        }
+
+        // 5. Try Model return type
         $modelResponse = $this->extractFromModelReturn($reflection);
         if ($modelResponse !== null) {
             return [$modelResponse];
         }
 
-        // 5. Fallback
+        // 6. Fallback
         return [$this->buildFallbackResponse()];
     }
 
@@ -289,6 +297,34 @@ class ResponseExtractorService implements ResponseExtractorInterface
         }
 
         return null;
+    }
+
+    /**
+     * Extract a response by statically tracing custom response helper methods.
+     *
+     * @return array<string, mixed>|null
+     */
+    protected function extractFromResponsePipeline(ReflectionMethod $method): ?array
+    {
+        $tracer = $this->pipelineTracer
+            ?? new ResponsePipelineTracerService(
+                $this->resourceAnalyzer ?? new ResourceSchemaAnalyzerService(),
+            );
+
+        $contract = $tracer->trace($method);
+
+        if ($contract === null) {
+            return null;
+        }
+
+        return [
+            'source' => 'response_pipeline',
+            'status_code' => $contract['status_code'],
+            'status_text' => $this->getStatusText($contract['status_code']),
+            'body' => $contract['example'],
+            'schema' => $contract['schema'],
+            'name' => 'Success Response',
+        ];
     }
 
     /**

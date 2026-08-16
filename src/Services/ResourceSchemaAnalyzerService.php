@@ -88,6 +88,16 @@ class ResourceSchemaAnalyzerService
     }
 
     /**
+     * Analyze a resource payload without applying the outer HTTP response wrapper.
+     *
+     * @return array{schema: array<string, mixed>, example: mixed}|null
+     */
+    public function analyzePayloadContract(string $resourceClass): ?array
+    {
+        return $this->analyzePayload($resourceClass);
+    }
+
+    /**
      * Analyze the array returned by a JsonResource without applying outer response wrapping.
      *
      * @return array{schema: array<string, mixed>, example: mixed}|null

@@ -19,6 +19,7 @@ Automatically generate **Postman Collection v2.1** files and **OpenAPI 3.0** spe
 - **Folder Grouping** — Organizes requests into folders based on route prefixes
 - **Response Examples** — Extracts response structures from PHPDoc, API Resources, `response()->json()`, and Eloquent models
 - **Response Contract Analysis** — Builds OpenAPI schemas from Laravel API Resources, including conditional fields, nested resources, collections, pagination, and top-level metadata
+- **Response Pipeline Tracing** — Statically follows controller, trait, inherited, and static response helpers to discover wrapped payloads and status codes without executing endpoints
 - **OpenAPI Support** — Export your API as a valid OpenAPI 3.0.3 specification
 - **Postman Upload** — Optionally upload generated Postman collections directly via the Postman API
 - **Artisan Command** — Beautiful CLI with progress indicators and colored output
@@ -180,13 +181,17 @@ php artisan postman:export --with-responses
    public function index() { ... }
    ```
 
-2. **API Resource** — Detects `return new UserResource(...)` patterns and reads the Resource's `$fillable`/`$visible` fields.
+2. **API Resource** — Detects direct Resource returns and builds response schemas from the Resource's `toArray()` structure.
 
 3. **`response()->json()`** — Parses inline `response()->json([...], 200)` calls to extract the body and status code.
 
-4. **Eloquent Model** — Detects `return User::find(...)` patterns and generates example data from the model's `$fillable` fields.
+4. **Response Pipeline Tracing** — Follows custom `$this->helper(...)`, inherited/trait helpers, and static response helper methods until it reaches `response()->json(...)`.
 
-5. **Fallback** — Uses the configured fallback status and body. By default, the body is `null` so unknown responses are not documented as fabricated success payloads.
+5. **Eloquent Model** — Detects `return User::find(...)` patterns and generates example data from the model's `$fillable` fields.
+
+6. **Fallback** — Uses the configured fallback status and body. By default, the body is `null` so unknown responses are not documented as fabricated success payloads.
+
+Response pipelines are analyzed statically. Controller endpoints and response helpers are not executed during export or contract checks.
 
 **Generated response format in Postman:**
 
