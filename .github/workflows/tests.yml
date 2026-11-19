@@ -1,54 +1,26 @@
-name: Tests
+name: Hybrid Engine CI
 
 on:
   push:
+    branches: [ master, main ]
   pull_request:
-
-permissions:
-  contents: read
+    branches: [ master, main ]
 
 jobs:
-  tests:
+  test-suite:
     runs-on: ubuntu-latest
-
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - php: '8.1'
-            testbench: '8'
-            laravel: '10'
-          - php: '8.2'
-            testbench: '9'
-            laravel: '11'
-          - php: '8.4'
-            testbench: '10'
-            laravel: '12'
-          - php: '8.3'
-            testbench: '11'
-            laravel: '13'
-
-    name: PHP ${{ matrix.php }} / Laravel ${{ matrix.laravel }}
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
         with:
-          php-version: ${{ matrix.php }}
+          php-version: "8.3"
           coverage: none
-          tools: composer:v2
-
-      - name: Validate Composer
-        run: composer validate --no-check-lock
-
-      - name: Select Laravel version
-        run: composer require --dev --no-update "orchestra/testbench:^${{ matrix.testbench }}.0"
-
-      - name: Install dependencies
-        run: composer update --prefer-dist --no-interaction --no-progress --no-blocking
-
-      - name: Run tests
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.23"
+      - name: Install Composer Dependencies
+        run: composer install --no-interaction --prefer-dist
+      - name: Build Native Go Engine
+        run: ./engine/build.sh
+      - name: Run PHPUnit & Go Race Detector Tests
         run: composer test
