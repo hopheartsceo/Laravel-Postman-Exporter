@@ -8,10 +8,6 @@ return [
     |--------------------------------------------------------------------------
     | Base URL
     |--------------------------------------------------------------------------
-    |
-    | The base URL used for all requests in the Postman collection.
-    | This is set as a Postman variable {{base_url}} in the collection.
-    |
     */
     'base_url' => env('APP_URL', 'http://localhost'),
 
@@ -19,9 +15,6 @@ return [
     |--------------------------------------------------------------------------
     | Default Headers
     |--------------------------------------------------------------------------
-    |
-    | Headers that will be added to every request in the collection.
-    |
     */
     'default_headers' => [
         'Accept' => 'application/json',
@@ -32,9 +25,6 @@ return [
     |--------------------------------------------------------------------------
     | Output Path
     |--------------------------------------------------------------------------
-    |
-    | The default file path where the generated Postman collection will be saved.
-    |
     */
     'output_path' => storage_path('app/postman-collection.json'),
 
@@ -42,14 +32,6 @@ return [
     |--------------------------------------------------------------------------
     | Route Filters
     |--------------------------------------------------------------------------
-    |
-    | Filter which routes are included in the collection.
-    |
-    | include_prefixes: Only include routes matching these prefixes (empty = all).
-    | exclude_prefixes: Exclude routes matching these prefixes.
-    | include_middleware: Only include routes with these middleware.
-    | exclude_middleware: Exclude routes with these middleware.
-    |
     */
     'route_filters' => [
         'include_prefixes' => [],
@@ -68,10 +50,6 @@ return [
     |--------------------------------------------------------------------------
     | Middleware to Headers Map
     |--------------------------------------------------------------------------
-    |
-    | Map middleware names to headers that should be added to requests
-    | that use those middleware.
-    |
     */
     'middleware_to_headers_map' => [
         'auth:sanctum' => [
@@ -87,44 +65,24 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Postman API Key
+    | Postman API Key & Cloud Sync
     |--------------------------------------------------------------------------
-    |
-    | Your Postman API key for uploading collections directly to Postman.
-    | Get your key from: https://go.postman.co/settings/me/api-keys
-    |
     */
     'postman_api_key' => env('POSTMAN_API_KEY', ''),
 
-    /*
-    |--------------------------------------------------------------------------
-    | Enable Upload
-    |--------------------------------------------------------------------------
-    |
-    | Whether to automatically upload the collection to Postman after generation.
-    |
-    */
     'enable_upload' => false,
+
+    'sync' => [
+        'collection_uid' => env('POSTMAN_COLLECTION_UID', ''),
+        'workspace_id' => env('POSTMAN_WORKSPACE_ID', ''),
+        'auto_wire_auth' => true,
+        'preserve_deprecated' => true,
+    ],
 
     /*
     |--------------------------------------------------------------------------
     | Folder Grouping
     |--------------------------------------------------------------------------
-    |
-    | Define how requests should be organized into folders.
-    |
-    | enabled: Whether to enable folder grouping.
-    | strategy: The grouping strategy (currently only 'prefix').
-    | fallback_folder: Folder name for routes that have no prefix.
-    |
-    | All routes sharing the same first URI prefix segment are grouped
-    | into one Postman folder. Routes without a prefix go into the
-    | fallback folder. No nested folders are created.
-    |
-    | strip_prefixes: Boilerplate URI prefixes that should be stripped
-    |   before determining the folder name. Longer prefixes are matched
-    |   first. Defaults: api/v1, api/v2, api/v3, api.
-    |
     */
     'grouping' => [
         'enabled' => true,
@@ -142,30 +100,11 @@ return [
     |--------------------------------------------------------------------------
     | Response Examples
     |--------------------------------------------------------------------------
-    |
-    | Include response examples in each Postman request.
-    |
-    | enabled: Whether to include response examples.
-    | fallback_status: Default HTTP status code when no response is detected.
-    | fallback_body: Default response body when no response is detected.
-    |
-    | Response sources are combined by distinct HTTP status code:
-    | - PHPDoc @response annotations
-    | - API Resource classes
-    | - response()->json() and response()->noContent() calls
-    | - Custom response helper pipelines
-    | - Eloquent model returns
-    | - Laravel default validation errors
-    | - Fallback response when no response can be inferred
-    |
     */
     'responses' => [
         'enabled' => true,
         'fallback_status' => 200,
         'fallback_body' => null,
-
-        // Add Laravel's default JSON 422 contract when validation rules are detected.
-        // Automatically skipped for FormRequests that override failedValidation().
         'framework_validation_errors' => true,
     ],
 
@@ -173,10 +112,6 @@ return [
     |--------------------------------------------------------------------------
     | API Contract Guard
     |--------------------------------------------------------------------------
-    |
-    | Baseline OpenAPI document used by `php artisan postman:check`.
-    | Commit this file or provide another path with --against.
-    |
     */
     'contract' => [
         'baseline_path' => base_path('openapi-baseline.json'),
@@ -184,33 +119,52 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Hybrid Go Engine
+    |--------------------------------------------------------------------------
+    */
+    'engine' => [
+        'binary_path' => env('LPE_ENGINE_PATH', __DIR__ . '/../bin/lpe-engine'),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Runtime Traffic Capture (Zero-Overhead Unix Socket Recorder)
+    |--------------------------------------------------------------------------
+    */
+    'capture' => [
+        'enabled' => env('LPE_CAPTURE_ENABLED', false),
+        'socket_path' => env('LPE_CAPTURE_SOCKET', '/tmp/lpe-recorder.sock'),
+        'recordings_path' => storage_path('app/lpe-recordings.ndjson'),
+        'max_body_bytes' => 32768,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Concurrent Chaos & Security Audit
+    |--------------------------------------------------------------------------
+    */
+    'audit' => [
+        'base_url' => env('LPE_AUDIT_URL', env('APP_URL', 'http://127.0.0.1:8000')),
+        'token' => env('LPE_AUDIT_TOKEN', ''),
+        'concurrency' => 10,
+        'chaos' => true,
+        'timeout' => 10,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Include Web Routes
     |--------------------------------------------------------------------------
-    |
-    | Whether to include web (non-API) routes in the collection.
-    | By default, only API routes are included.
-    |
     */
     'include_web_routes' => false,
 
     /*
     |--------------------------------------------------------------------------
-    | Collection Name
+    | Collection Name & Description
     |--------------------------------------------------------------------------
-    |
-    | The name of the generated Postman collection.
-    |
     */
     'collection_name' => env('APP_NAME', 'Laravel') . ' API Collection',
 
-    /*
-    |--------------------------------------------------------------------------
-    | Collection Description
-    |--------------------------------------------------------------------------
-    |
-    | Description text for the Postman collection.
-    |
-    */
     'collection_description' => 'Auto-generated API collection from Laravel routes.',
 
 ];

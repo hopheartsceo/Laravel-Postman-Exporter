@@ -1,11 +1,10 @@
-# Laravel Postman Exporter
+# Laravel Postman Exporter (v3.0 Hybrid Engine)
 
 [![Laravel](https://img.shields.io/badge/Laravel-10%2B-red.svg)](https://laravel.com)
 [![PHP](https://img.shields.io/badge/PHP-8.1%2B-blue.svg)](https://php.net)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Go Engine](https://img.shields.io/badge/Go_Engine-1.27%2B-00ADD8.svg)](https://go.dev)
 
-Automatically generate **Postman Collection v2.1** files and **OpenAPI 3.0** specifications from your Laravel application routes, controllers, and FormRequest validations — complete with **folder grouping** and **response examples**.
-
+Hybrid **Laravel AST + Go Concurrency Engine** with **3-Way Smart Cloud Sync** (`postman:sync`), **Zero-Overhead Unix Socket Traffic Recorder** (`postman:record`), and **Concurrent Chaos & Security Auditor** (`postman:audit`).
 ---
 
 ## Features

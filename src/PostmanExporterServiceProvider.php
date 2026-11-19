@@ -4,29 +4,35 @@ declare(strict_types=1);
 
 namespace Hopheartsceo\PostmanExporter;
 
-use Hopheartsceo\PostmanExporter\Commands\CheckApiContractCommand;
-use Hopheartsceo\PostmanExporter\Commands\ExportPostmanCommand;
 use Hopheartsceo\PostmanExporter\Builders\OpenApiDocumentBuilder;
 use Hopheartsceo\PostmanExporter\Builders\OpenApiPathBuilder;
+use Hopheartsceo\PostmanExporter\Commands\AuditApiCommand;
+use Hopheartsceo\PostmanExporter\Commands\CheckApiContractCommand;
+use Hopheartsceo\PostmanExporter\Commands\ExportPostmanCommand;
+use Hopheartsceo\PostmanExporter\Commands\RecordTrafficCommand;
+use Hopheartsceo\PostmanExporter\Commands\SyncPostmanCommand;
+use Hopheartsceo\PostmanExporter\Contracts\ExampleResponseGeneratorInterface;
+use Hopheartsceo\PostmanExporter\Contracts\FolderOrganizerInterface;
+use Hopheartsceo\PostmanExporter\Contracts\ResponseExtractorInterface;
 use Hopheartsceo\PostmanExporter\Mappers\ValidationToJsonSchemaMapper;
+use Hopheartsceo\PostmanExporter\Middleware\RuntimeTrafficRecorderMiddleware;
 use Hopheartsceo\PostmanExporter\Services\ContractDiffService;
 use Hopheartsceo\PostmanExporter\Services\ExampleDataGeneratorService;
 use Hopheartsceo\PostmanExporter\Services\ExampleResponseGeneratorService;
 use Hopheartsceo\PostmanExporter\Services\FolderOrganizerService;
 use Hopheartsceo\PostmanExporter\Services\FormRequestRulesResolverService;
 use Hopheartsceo\PostmanExporter\Services\FrameworkErrorResponseService;
+use Hopheartsceo\PostmanExporter\Services\GoEngineBridgeService;
 use Hopheartsceo\PostmanExporter\Services\OpenApiExporterService;
 use Hopheartsceo\PostmanExporter\Services\PostmanCollectionBuilderService;
 use Hopheartsceo\PostmanExporter\Services\PostmanUploaderService;
 use Hopheartsceo\PostmanExporter\Services\RequestAnalyzerService;
+use Hopheartsceo\PostmanExporter\Services\ResourceSchemaAnalyzerService;
 use Hopheartsceo\PostmanExporter\Services\ResponseExtractorService;
 use Hopheartsceo\PostmanExporter\Services\ResponsePipelineTracerService;
-use Hopheartsceo\PostmanExporter\Services\ResourceSchemaAnalyzerService;
 use Hopheartsceo\PostmanExporter\Services\RouteScannerService;
 use Hopheartsceo\PostmanExporter\Services\ValidationParserService;
-use Hopheartsceo\PostmanExporter\Contracts\FolderOrganizerInterface;
-use Hopheartsceo\PostmanExporter\Contracts\ResponseExtractorInterface;
-use Hopheartsceo\PostmanExporter\Contracts\ExampleResponseGeneratorInterface;
+use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Support\ServiceProvider;
 
 class PostmanExporterServiceProvider extends ServiceProvider
@@ -76,6 +82,12 @@ class PostmanExporterServiceProvider extends ServiceProvider
 
         $this->app->singleton(ContractDiffService::class, function () {
             return new ContractDiffService();
+        });
+
+        $this->app->singleton(GoEngineBridgeService::class, function ($app) {
+            return new GoEngineBridgeService(
+                $app['config']->get('postman-exporter', [])
+            );
         });
 
         $this->app->singleton(FolderOrganizerService::class, function ($app) {
@@ -179,6 +191,15 @@ class PostmanExporterServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        if ($this->app->bound(Kernel::class)) {
+            $kernel = $this->app->make(Kernel::class);
+            if (method_exists($kernel, 'appendMiddlewareToGroup')) {
+                $kernel->appendMiddlewareToGroup('api', RuntimeTrafficRecorderMiddleware::class);
+            }
+        } elseif ($this->app->bound('router')) {
+            $this->app['router']->pushMiddlewareToGroup('api', RuntimeTrafficRecorderMiddleware::class);
+        }
+
         if ($this->app->runningInConsole()) {
             $this->publishes([
                 __DIR__ . '/../config/postman-exporter.php' => config_path('postman-exporter.php'),
@@ -187,6 +208,9 @@ class PostmanExporterServiceProvider extends ServiceProvider
             $this->commands([
                 ExportPostmanCommand::class,
                 CheckApiContractCommand::class,
+                SyncPostmanCommand::class,
+                RecordTrafficCommand::class,
+                AuditApiCommand::class,
             ]);
         }
     }

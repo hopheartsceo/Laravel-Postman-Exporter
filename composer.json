@@ -25,7 +25,8 @@
         "illuminate/console": "^10.0|^11.0|^12.0|^13.0",
         "illuminate/http": "^10.0|^11.0|^12.0|^13.0",
         "guzzlehttp/guzzle": "^7.0",
-        "nikic/php-parser": "^5.0"
+        "nikic/php-parser": "^5.0",
+        "symfony/process": "^6.0|^7.0|^8.0"
     },
     "require-dev": {
         "cebe/php-openapi": "^1.7",
@@ -58,7 +59,11 @@
         "sort-packages": true
     },
     "scripts": {
-        "test": "vendor/bin/phpunit",
-        "test-coverage": "vendor/bin/phpunit --coverage-html coverage"
+        "test": [
+            "@php vendor/bin/phpunit",
+            "cd engine && go test -race ./..."
+        ],
+        "test-coverage": "vendor/bin/phpunit --coverage-html coverage",
+        "build-engine": "./engine/build.sh"
     }
 }
