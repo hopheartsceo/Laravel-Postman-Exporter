@@ -31,15 +31,6 @@ php artisan postman:export --format=postman
 php artisan postman:check --write-baseline && php artisan postman:check
 ```
 
-## Running Tests
-
-```bash
-composer test
-```
-
-## License
-
-MIT — Built by [Wessaal](https://github.com/hopheartsceo).
 ---
 
 ## Usage
