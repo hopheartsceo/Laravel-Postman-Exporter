@@ -351,6 +351,10 @@ vendor/bin/phpunit
 | `ExampleResponseGeneratorService` | Converts extracted response data into Postman-formatted response arrays |
 | `PostmanCollectionBuilderService` | Builds Postman v2.1 JSON structure with folders and response examples |
 | `PostmanUploaderService` | Uploads collections to Postman API |
+| `GoEngineBridgeService` | Bridges Laravel AST output and runtime streams with the native Go binary |
+| `SyncPostmanCommand` | Executes 3-way smart merge with Postman Cloud and auto-wires login token scripts |
+| `RecordTrafficCommand` | Captures live HTTP traffic over Unix Domain Socket with automatic secret redaction |
+| `AuditApiCommand` | Runs concurrent Go worker goroutines for auth-bypass and chaos payload fuzzing |
 
 ---
 
